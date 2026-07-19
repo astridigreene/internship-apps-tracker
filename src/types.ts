@@ -26,7 +26,7 @@ export interface Stats {
 }
 
 export interface TrackerData {
-  lastSynced: string
+  lastSynced: string | null
   stats: Stats
   applications: Application[]
 }

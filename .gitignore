@@ -15,6 +15,18 @@ __pycache__/
 .venv/
 *.pyc
 
+# Secrets & credentials — never commit these
+.env
+.env.*
+!.env.example
+*.pem
+*credentials*.json
+*service-account*.json
+*-key.json
+
+# Local-only copy of synced sheet data (optional)
+src/data/data.local.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

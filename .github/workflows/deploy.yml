@@ -1,5 +1,7 @@
 name: Deploy to GitHub Pages
 
+# Builds the static shell only. Application rows are never baked into the build —
+# visitors must sign in with Google to load the private spreadsheet.
 on:
   push:
     branches: [main]
@@ -34,6 +36,10 @@ jobs:
         run: npm run build
         env:
           VITE_BASE_PATH: /${{ github.event.repository.name }}/
+          # Public OAuth client ID + Sheet ID (access still gated by Google account / Sheet ACL).
+          # Allowed email is hardcoded in src/lib/config.ts (astridig@umich.edu).
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+          VITE_SHEET_ID: ${{ secrets.VITE_SHEET_ID }}
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

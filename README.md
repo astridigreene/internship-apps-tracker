@@ -1,128 +1,114 @@
 # Application Tracker
 
-Static internship application dashboard. Data lives in a Google Sheet; a GitHub Action syncs rows into `src/data/data.json`, and the Vite + React site is deployed to GitHub Pages.
+Static internship dashboard (Vite + React). The repo stays public-safe: **no application rows or credentials are committed**. Visitors sign in with Google; the app then reads your private Sheet with their OAuth token.
+
+## How access control works
+
+1. **Google Sign-In** — OAuth in the browser (Google Identity Services).
+3. **Hardcoded allowlist** — only `astridig@umich.edu` may sign in (see `src/lib/config.ts`).
+4. **Sheet ACL (real gate)** — Keep the spreadsheet private and shared only with that Google account. Other signed-in users get a Sheets API 403 even if they bypass the UI check.
+5. **No baked-in data** — The GitHub Pages build ships an empty shell. Rows are fetched after login and live only in memory.
+
+Do **not** share the Sheet publicly or with “anyone with the link”.
 
 ## Stack
 
 - Vite + React + TypeScript + Tailwind CSS
-- Recharts (status funnel)
-- Google Sheets API (service account)
-- GitHub Actions → GitHub Pages
+- Recharts
+- Google Identity Services + Google Sheets API (browser OAuth)
+- GitHub Pages
 
 ## Local development
 
 ```bash
+cp .env.example .env.local
+# fill in VITE_GOOGLE_CLIENT_ID and VITE_SHEET_ID
 npm install
 npm run dev
 ```
 
-Uses the checked-in sample data in `src/data/data.json`. Build with:
+Only `astridig@umich.edu` can sign in. `.env.local` is gitignored — never commit it.
 
-```bash
-npm run build
-npm run preview
-```
+## Google Cloud OAuth setup
 
-For local preview of a GitHub Pages project site, the Vite `base` path defaults to `/internship-apps-dashboard/`. Override with `VITE_BASE_PATH=/` if needed.
+1. Open [Google Cloud Console](https://console.cloud.google.com/) → create/select a project.
+2. Enable **Google Sheets API**.
+3. **APIs & Services → OAuth consent screen** — configure as External (or Internal if Workspace). Add scopes:
+   - `.../auth/spreadsheets.readonly`
+   - `email`, `profile`, `openid`
+4. **Credentials → Create credentials → OAuth client ID → Web application**.
+5. Authorized JavaScript origins (examples):
+   - `http://localhost:5173`
+   - `https://<your-username>.github.io`
+6. Copy the **Client ID** (safe to expose in the frontend).
+7. Create your Google Sheet with headers:
 
-## Google Cloud setup (Sheets API)
+   | Company | Location | Role | Date Applied | Status |
 
-1. Open [Google Cloud Console](https://console.cloud.google.com/) and create (or select) a project.
-2. Enable **Google Sheets API** for the project.
-3. Create a **service account** (IAM & Admin → Service Accounts → Create).
-4. Open the service account → **Keys** → **Add key** → **Create new key** → JSON.
-5. Download the JSON key file — this is the value for `GOOGLE_SERVICE_ACCOUNT_KEY`.
-6. Open your Google Sheet and share it with the service account email (`…@….iam.gserviceaccount.com`) as **Viewer**.
-7. Copy the spreadsheet ID from the Sheet URL:
+   Status values: `Applied`, `OA`, `Interview`, `Offer`, `Rejected`
+
+8. Keep the Sheet **private**. Share it only with the Google account you will use to sign in.
+9. Copy the Sheet ID from the URL:
    `https://docs.google.com/spreadsheets/d/<SHEET_ID>/edit`
 
-### Expected sheet columns
+### Publishing / testing mode
 
-Row 1 headers (exact names):
+While the OAuth app is in **Testing**, add your Google account as a test user on the consent screen.
 
-| Company | Location | Role | Date Applied | Status |
+## GitHub secrets (for Pages build)
 
-**Status** values: `Applied`, `OA`, `Interview`, `Offer`, `Rejected`
+**Settings → Secrets and variables → Actions**:
 
-## GitHub repository secrets
-
-In the repo: **Settings → Secrets and variables → Actions**, add:
-
-| Secret | Value |
+| Secret | Purpose |
 | --- | --- |
-| `GOOGLE_SERVICE_ACCOUNT_KEY` | Full contents of the service account JSON key file |
-| `SHEET_ID` | Spreadsheet ID from the Sheet URL |
+| `VITE_GOOGLE_CLIENT_ID` | OAuth Web client ID (public by design; still inject via secret to avoid hardcoding) |
+| `VITE_SHEET_ID` | Spreadsheet ID |
 
-The sync workflow (`.github/workflows/sync.yml`) needs write access to `main` (default `GITHUB_TOKEN` with `contents: write` is enough for a same-repo push).
+Sign-in is restricted in code to `astridig@umich.edu` — no email secret needed.
 
-## Sync workflow
+There is **no** service-account key and **no** GitHub PAT required for the site itself.
 
-`.github/workflows/sync.yml` runs on:
-
-- `repository_dispatch` with type `sheet-updated` (fired by the Apps Script)
-- Manual **workflow_dispatch** (Actions → Sync Sheet Data → Run workflow)
-
-It:
-
-1. Authenticates to Google Sheets with the service account
-2. Reads all rows
-3. Computes totals and rates (count ÷ total applications, as %)
-4. Writes `src/data/data.json`
-5. Commits and pushes only if the file changed (`sync: update application data`)
-
-You can run the sync locally as well:
-
-```bash
-export GOOGLE_SERVICE_ACCOUNT_KEY="$(cat path/to/key.json)"
-export SHEET_ID="your-sheet-id"
-pip install -r requirements.txt
-python scripts/sync_sheet.py
-```
-
-## Apps Script trigger (`google-apps-script/onEdit.gs`)
-
-1. Open the Sheet → **Extensions → Apps Script**.
-2. Paste the contents of `google-apps-script/onEdit.gs`.
-3. Replace the placeholders at the top:
-   ```javascript
-   var OWNER = "your-github-username";
-   var REPO = "internship-apps-dashboard";
-   ```
-4. **Project Settings → Script Properties** → add:
-   | Property | Value |
-   | --- | --- |
-   | `GITHUB_TOKEN` | GitHub PAT with permission to create `repository_dispatch` events on this repo (classic: `repo` scope; or fine-grained: Contents: Read + Metadata, and permission to dispatch workflow events / administer if required) |
-5. Save the script.
-6. Run `createInstallableOnEditTrigger` once from the editor (authorize when prompted). This creates an installable trigger for `handleSheetEdit` — required because `UrlFetchApp` cannot run from a simple `onEdit`.
-7. When you complete a new row (all five columns filled, Status valid), the script POSTs to:
-   `https://api.github.com/repos/{OWNER}/{REPO}/dispatches`
-   with `event_type: "sheet-updated"`.
+> Note: Vite embeds `VITE_*` values into the client bundle. That is expected for the OAuth client ID. The Sheet ID is not a password — protection comes from keeping the Sheet private. Do not put service-account private keys or PATs in any `VITE_*` variable.
 
 ## Deploy (GitHub Pages)
 
-`.github/workflows/deploy.yml` builds and deploys on every push to `main` (including data-sync commits).
+`.github/workflows/deploy.yml` builds and deploys the empty authenticated shell on push to `main`.
 
-Enable Pages:
+1. **Settings → Pages → Source:** GitHub Actions
+2. Add the two secrets above
+3. Push to `main`
 
-1. **Settings → Pages → Build and deployment → Source:** GitHub Actions
-2. Push to `main` (or run the Deploy workflow manually)
+URL: `https://<owner>.github.io/<repo>/`
 
-The site URL will be:
+## Optional: local CLI export
 
-`https://<owner>.github.io/<repo>/`
+`scripts/sync_sheet.py` can still pull a sheet with a **service account** for offline use. Prefer not to use it if the repo is public — it tempts committing `data.json`. If you do run it locally, restore the empty stub before committing:
+
+```bash
+cp src/data/data.example.json src/data/data.json
+```
+
+Service account JSON must stay **outside** the repo.
+
+## Optional: Apps Script dispatch
+
+`google-apps-script/onEdit.gs` is **not required** with live OAuth fetch (Refresh in the UI reloads the sheet). Keep it only if you want a custom automation; do not store PATs in git.
 
 ## Project layout
 
 ```
-.github/workflows/
-  sync.yml          # Sheet → data.json
-  deploy.yml        # Build + GitHub Pages
-google-apps-script/
-  onEdit.gs         # Sheet edit → repository_dispatch
-scripts/
-  sync_sheet.py     # Google Sheets → src/data/data.json
+.env.example                 # Template for local env (no secrets)
+.github/workflows/deploy.yml # Build + Pages (no sheet data in git)
 src/
-  data/data.json    # Generated + sample source of truth for the UI
-  components/       # Lightning-style UI pieces
-  views/            # Dashboard + Applications
+  lib/googleAuth.ts          # Google sign-in
+  lib/sheet.ts               # Sheets fetch + stats
+  components/LoginScreen.tsx
+  data/data.json             # Empty public stub
 ```
+
+## What must never be committed
+
+- Service account JSON / private keys
+- GitHub PATs
+- `.env` / `.env.local`
+- Real application rows in `src/data/data.json`

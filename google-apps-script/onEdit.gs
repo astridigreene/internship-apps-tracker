@@ -1,15 +1,11 @@
 /**
- * Bound Apps Script for the internship tracker Google Sheet.
+ * OPTIONAL — not used when the site loads the Sheet via Google Sign-In.
  *
- * Setup:
- * 1. Extensions → Apps Script, paste this file contents
- * 2. Project Settings → Script Properties, add:
- *      GITHUB_TOKEN  = a fine-grained or classic PAT with `repo` scope
- *                      (needs permission to create repository_dispatch events)
- * 3. Replace OWNER and REPO below with your GitHub username/org and repo name
- * 4. Save, then Run → onEdit once to authorize OAuth scopes
- * 5. Ensure an installable onEdit trigger exists (Edit → Current project's triggers)
- *    if the simple trigger is insufficient (UrlFetchApp requires authorized trigger)
+ * Bound Apps Script for the internship tracker Google Sheet.
+ * Only needed if you want a custom GitHub automation on edit.
+ *
+ * Security: never paste PATs into this repo. Store GITHUB_TOKEN in
+ * Apps Script Properties Service only.
  */
 
 var OWNER = "OWNER"; // e.g. "astridgreene"
