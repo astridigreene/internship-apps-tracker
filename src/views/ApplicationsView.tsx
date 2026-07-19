@@ -4,12 +4,14 @@ import {
   type Application,
   type ApplicationStatus,
   type NewApplicationInput,
+  type OaComplete,
 } from '../types'
 import { StatusSelect } from '../components/StatusSelect'
 import { StatusPill } from '../components/StatusPill'
 import { NewApplicationModal } from '../components/NewApplicationModal'
 import { DeleteConfirmModal } from '../components/DeleteConfirmModal'
 import { ConfirmModal } from '../components/ConfirmModal'
+import { ApplicationDetailModal } from '../components/ApplicationDetailModal'
 
 type SortKey = 'company' | 'location' | 'role' | 'dateApplied' | 'status'
 type SortDir = 'asc' | 'desc'
@@ -59,6 +61,7 @@ interface ApplicationsViewProps {
   onSaveStatusChanges?: (changes: StatusEditChange[]) => Promise<void>
   onAddApplication?: (application: NewApplicationInput) => Promise<void>
   onDeleteApplication?: (app: Application) => Promise<void>
+  onUpdateOaComplete?: (app: Application, oaComplete: OaComplete) => Promise<void>
 }
 
 function parseDate(value: string): number {
@@ -179,6 +182,7 @@ export function ApplicationsView({
   onSaveStatusChanges,
   onAddApplication,
   onDeleteApplication,
+  onUpdateOaComplete,
 }: ApplicationsViewProps) {
   const [query, setQuery] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('dateApplied')
@@ -187,6 +191,7 @@ export function ApplicationsView({
   const [drafts, setDrafts] = useState<Record<number, ApplicationStatus | string>>({})
   const [newOpen, setNewOpen] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<Application | null>(null)
+  const [detailApp, setDetailApp] = useState<Application | null>(null)
   const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false)
 
   const statusOf = (app: Application) => drafts[app.sheetRow] ?? app.status
@@ -283,7 +288,32 @@ export function ApplicationsView({
     discardEdits()
   }
 
+  async function handleDetailStatusUpdate(app: Application, toStatus: ApplicationStatus) {
+    if (!onSaveStatusChanges) {
+      return
+    }
+    await onSaveStatusChanges([
+      {
+        app,
+        fromStatus: app.status,
+        toStatus,
+      },
+    ])
+    setDrafts((current) => {
+      if (!(app.sheetRow in current)) {
+        return current
+      }
+      const next = { ...current }
+      delete next[app.sheetRow]
+      return next
+    })
+  }
+
   const busy = Boolean(saving || adding || deleting)
+  const detailAppLive =
+    detailApp === null
+      ? null
+      : (applications.find((a) => a.sheetRow === detailApp.sheetRow) ?? detailApp)
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col gap-2.5">
@@ -295,20 +325,6 @@ export function ApplicationsView({
           placeholder="Search…"
           className="h-9 min-w-[200px] flex-1 rounded border border-app-border bg-app-surface px-3 text-[13px] font-semibold text-app-text outline-none placeholder:font-medium placeholder:text-app-text-weak focus:border-app-brand"
         />
-        <select
-          value={statusFilter}
-          onChange={(e) =>
-            onStatusFilterChange(e.target.value as ApplicationsStatusFilter)
-          }
-          aria-label="Status filter"
-          className="h-9 rounded border border-app-border bg-app-surface px-2.5 text-[13px] font-semibold text-app-text outline-none focus:border-app-brand"
-        >
-          {STATUS_OPTIONS.map((opt) => (
-            <option key={opt} value={opt}>
-              {opt}
-            </option>
-          ))}
-        </select>
         <p className="text-[12px] font-bold text-app-text-weak tabular-nums">
           {filtered.length}/{applications.length}
         </p>
@@ -375,6 +391,37 @@ export function ApplicationsView({
         </div>
       </div>
 
+      <div className="flex w-full shrink-0 flex-wrap items-center gap-1.5">
+        <span className="mr-0.5 text-[11px] font-bold tracking-[0.06em] uppercase text-app-text-weak">
+          Filters
+        </span>
+        <div
+          role="group"
+          aria-label="Status filters"
+          className="flex flex-wrap items-center gap-1.5"
+        >
+          {STATUS_OPTIONS.map((opt) => {
+            const active = statusFilter === opt
+            return (
+              <button
+                key={opt}
+                type="button"
+                aria-pressed={active}
+                onClick={() => onStatusFilterChange(opt)}
+                className={[
+                  'inline-flex h-8 items-center rounded border px-2.5 text-[12px] font-bold transition-colors',
+                  active
+                    ? 'border-app-brand bg-app-brand text-white dark:text-teal-950'
+                    : 'border-app-border bg-app-surface text-app-text hover:border-app-brand/50 hover:bg-app-hover',
+                ].join(' ')}
+              >
+                {opt}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
       <NewApplicationModal
         open={newOpen}
         submitting={adding}
@@ -418,6 +465,18 @@ export function ApplicationsView({
           await onDeleteApplication(pendingDelete)
           setPendingDelete(null)
         }}
+      />
+
+      <ApplicationDetailModal
+        app={detailAppLive}
+        saving={saving}
+        onClose={() => {
+          if (!saving) {
+            setDetailApp(null)
+          }
+        }}
+        onUpdateStatus={onSaveStatusChanges ? handleDetailStatusUpdate : undefined}
+        onUpdateOaComplete={onUpdateOaComplete}
       />
 
       <div className="min-h-0 w-full flex-1 overflow-auto rounded-md border border-panel-border bg-app-surface">
@@ -471,7 +530,8 @@ export function ApplicationsView({
                 return (
                   <tr
                     key={`${app.sheetRow}-${app.company}-${app.dateApplied}-${i}`}
-                    className="h-10 border-b border-app-border last:border-b-0 hover:bg-app-hover"
+                    className="h-10 cursor-pointer border-b border-app-border last:border-b-0 hover:bg-app-hover"
+                    onClick={() => setDetailApp(app)}
                   >
                     <td className="truncate px-3 py-0 font-bold text-app-text">{app.company}</td>
                     <td className="truncate px-3 py-0 font-semibold text-app-text">
@@ -481,7 +541,14 @@ export function ApplicationsView({
                     <td className="px-3 py-0 font-semibold whitespace-nowrap text-app-text tabular-nums">
                       {app.dateApplied}
                     </td>
-                    <td className="px-3 py-0">
+                    <td
+                      className="px-3 py-0"
+                      onClick={(event) => {
+                        if (editing) {
+                          event.stopPropagation()
+                        }
+                      }}
+                    >
                       {editing ? (
                         <StatusSelect
                           value={status}
@@ -498,7 +565,10 @@ export function ApplicationsView({
                         title={`Delete ${app.company || 'application'}`}
                         aria-label={`Delete ${app.company || 'application'}`}
                         disabled={!onDeleteApplication || busy}
-                        onClick={() => setPendingDelete(app)}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          setPendingDelete(app)
+                        }}
                         className="inline-flex h-8 w-8 items-center justify-center rounded text-rose-600 hover:bg-rose-500/10 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-40 dark:text-rose-400 dark:hover:text-rose-300"
                       >
                         <TrashIcon />

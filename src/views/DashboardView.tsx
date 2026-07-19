@@ -1,26 +1,67 @@
-import { useMemo } from 'react'
-import type { TrackerData } from '../types'
+import { useMemo, useState } from 'react'
+import type { Application, ApplicationStatus, OaComplete, TrackerData } from '../types'
 import { KpiCard } from '../components/KpiCard'
 import { StatusFunnel } from '../components/StatusFunnel'
 import { RecentUpdates } from '../components/RecentUpdates'
 import { OaCard } from '../components/OaCard'
+import { ApplicationDetailModal } from '../components/ApplicationDetailModal'
 import { computeStats } from '../lib/sheet'
-import type { ApplicationsStatusFilter } from './ApplicationsView'
+import type { ApplicationsStatusFilter, StatusEditChange } from './ApplicationsView'
 
 interface DashboardViewProps {
   data: TrackerData
+  saving?: boolean
   onOpenApplications: (filter: ApplicationsStatusFilter) => void
+  onSaveStatusChanges?: (changes: StatusEditChange[]) => Promise<void>
+  onUpdateOaComplete?: (app: Application, oaComplete: OaComplete) => Promise<void>
 }
 
 function formatRate(rate: number): string {
   return `${rate.toFixed(1)}%`
 }
 
-export function DashboardView({ data, onOpenApplications }: DashboardViewProps) {
+export function DashboardView({
+  data,
+  saving,
+  onOpenApplications,
+  onSaveStatusChanges,
+  onUpdateOaComplete,
+}: DashboardViewProps) {
   const stats = useMemo(() => computeStats(data.applications), [data.applications])
+  const [detailApp, setDetailApp] = useState<Application | null>(null)
+
+  const detailAppLive =
+    detailApp === null
+      ? null
+      : (data.applications.find((a) => a.sheetRow === detailApp.sheetRow) ?? detailApp)
+
+  async function handleDetailStatusUpdate(app: Application, toStatus: ApplicationStatus) {
+    if (!onSaveStatusChanges) {
+      return
+    }
+    await onSaveStatusChanges([
+      {
+        app,
+        fromStatus: app.status,
+        toStatus,
+      },
+    ])
+  }
 
   return (
     <div className="flex min-h-0 flex-col gap-2 lg:h-full">
+      <ApplicationDetailModal
+        app={detailAppLive}
+        saving={saving}
+        onClose={() => {
+          if (!saving) {
+            setDetailApp(null)
+          }
+        }}
+        onUpdateStatus={onSaveStatusChanges ? handleDetailStatusUpdate : undefined}
+        onUpdateOaComplete={onUpdateOaComplete}
+      />
+
       <div className="grid shrink-0 grid-cols-5 gap-2">
         <KpiCard
           compact
@@ -68,13 +109,21 @@ export function DashboardView({ data, onOpenApplications }: DashboardViewProps) 
           <OaCard
             applications={data.applications}
             onOpenAll={() => onOpenApplications('OA')}
+            onSelectApplication={setDetailApp}
           />
         </div>
         <div className="min-h-0 lg:col-span-5">
-          <StatusFunnel applications={data.applications} fill />
+          <StatusFunnel
+            applications={data.applications}
+            fill
+            onSelectStage={onOpenApplications}
+          />
         </div>
         <div className="min-h-0 lg:col-span-3">
-          <RecentUpdates applications={data.applications} limit={5} />
+          <RecentUpdates
+            applications={data.applications}
+            onSelectApplication={setDetailApp}
+          />
         </div>
       </div>
     </div>

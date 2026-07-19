@@ -213,7 +213,7 @@ export function NewApplicationModal({
               disabled={!complete || submitting}
               className="h-9 rounded bg-app-brand px-3 text-[12px] font-bold text-white hover:bg-app-brand-dark disabled:cursor-not-allowed disabled:opacity-45 dark:text-teal-950"
             >
-              {submitting ? 'Saving…' : 'Add to sheet'}
+              {submitting ? 'Saving…' : 'Save'}
             </button>
           </div>
         </form>

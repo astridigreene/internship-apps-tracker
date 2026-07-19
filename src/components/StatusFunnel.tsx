@@ -11,29 +11,37 @@ import {
 } from 'recharts'
 import type { Application } from '../types'
 import { isRejectedStatus } from '../types'
+import type { ApplicationsStatusFilter } from '../views/ApplicationsView'
 
 interface StatusFunnelProps {
   applications: Application[]
   fill?: boolean
+  onSelectStage?: (filter: ApplicationsStatusFilter) => void
 }
 
 const STAGES = ['OA', 'Interview', 'Offer', 'Rejected'] as const
 
-const STAGE_COLORS_LIGHT: Record<(typeof STAGES)[number], string> = {
+type Stage = (typeof STAGES)[number]
+
+function stageToFilter(stage: Stage): ApplicationsStatusFilter {
+  return stage
+}
+
+const STAGE_COLORS_LIGHT: Record<Stage, string> = {
   OA: '#3b82f6',
   Interview: '#f97316',
   Offer: '#10b981',
   Rejected: '#f43f5e',
 }
 
-const STAGE_COLORS_DARK: Record<(typeof STAGES)[number], string> = {
+const STAGE_COLORS_DARK: Record<Stage, string> = {
   OA: '#60a5fa',
   Interview: '#fb923c',
   Offer: '#34d399',
   Rejected: '#fb7185',
 }
 
-const STAGE_FOOTER: Record<(typeof STAGES)[number], string> = {
+const STAGE_FOOTER: Record<Stage, string> = {
   OA: 'bg-status-oa-bg text-status-oa-text',
   Interview: 'bg-status-interview-bg text-status-interview-text',
   Offer: 'bg-status-offer-bg text-status-offer-text',
@@ -66,7 +74,7 @@ function cssVar(name: string, fallback: string) {
   return value || fallback
 }
 
-export function StatusFunnel({ applications, fill }: StatusFunnelProps) {
+export function StatusFunnel({ applications, fill, onSelectStage }: StatusFunnelProps) {
   const dark = usePrefersDark()
   const stageColors = dark ? STAGE_COLORS_DARK : STAGE_COLORS_LIGHT
 
@@ -92,6 +100,10 @@ export function StatusFunnel({ applications, fill }: StatusFunnelProps) {
     count: current[stage],
   }))
 
+  function selectStage(stage: Stage) {
+    onSelectStage?.(stageToFilter(stage))
+  }
+
   const grid = cssVar('--color-chart-grid', '#d5e4ea')
   const tick = cssVar('--color-chart-tick', '#5b7c86')
   const cursor = cssVar('--color-chart-cursor', '#f0fdfa')
@@ -108,7 +120,9 @@ export function StatusFunnel({ applications, fill }: StatusFunnelProps) {
     >
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-app-border bg-app-muted px-2.5 py-1.5">
         <h2 className="text-[12px] font-semibold text-panel-title">Pipeline</h2>
-        <p className="text-[10px] text-panel-sub/80">Current status counts</p>
+        <p className="text-[10px] text-panel-sub/80">
+          {onSelectStage ? 'Click a bar to filter' : 'Current status counts'}
+        </p>
       </div>
       <div className={fill ? 'min-h-0 flex-1 px-1.5 py-2' : 'h-44 px-2 py-3'}>
         <ResponsiveContainer width="100%" height="100%">
@@ -147,7 +161,18 @@ export function StatusFunnel({ applications, fill }: StatusFunnelProps) {
                 return [`${value as number} current`, stage]
               }}
             />
-            <Bar dataKey="count" radius={[3, 3, 0, 0]} maxBarSize={56}>
+            <Bar
+              dataKey="count"
+              radius={[3, 3, 0, 0]}
+              maxBarSize={56}
+              cursor={onSelectStage ? 'pointer' : undefined}
+              onClick={(item) => {
+                const stage = (item as { payload?: { stage?: Stage } })?.payload?.stage
+                if (stage && STAGES.includes(stage)) {
+                  selectStage(stage)
+                }
+              }}
+            >
               {chartData.map((entry) => (
                 <Cell key={entry.stage} fill={stageColors[entry.stage]} />
               ))}
@@ -157,12 +182,18 @@ export function StatusFunnel({ applications, fill }: StatusFunnelProps) {
       </div>
       <div className="grid shrink-0 grid-cols-4 gap-px border-t border-app-border bg-app-border">
         {STAGES.map((stage) => (
-          <div key={stage} className={`px-1.5 py-1 text-center ${STAGE_FOOTER[stage]}`}>
+          <button
+            key={stage}
+            type="button"
+            onClick={() => selectStage(stage)}
+            disabled={!onSelectStage}
+            className={`px-1.5 py-1 text-center ${STAGE_FOOTER[stage]} disabled:cursor-default`}
+          >
             <p className="text-[9px] font-semibold tracking-[0.06em] uppercase opacity-80">
               {stage}
             </p>
             <p className="text-[12px] font-bold tabular-nums">{current[stage]}</p>
-          </div>
+          </button>
         ))}
       </div>
     </div>
