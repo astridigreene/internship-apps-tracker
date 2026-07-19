@@ -14,7 +14,22 @@ from googleapiclient.discovery import build
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
 EXPECTED_HEADERS = ["Company", "Location", "Role", "Date Applied", "Status"]
-VALID_STATUSES = {"Applied", "OA", "Interview", "Offer", "Rejected"}
+VALID_STATUSES = {
+    "Applied",
+    "OA",
+    "Interview",
+    "Offer",
+    "Rejected",
+    "OA->Rejected",
+    "Interview->Rejected",
+}
+REJECTION_STATUSES = {"Rejected", "OA->Rejected", "Interview->Rejected"}
+
+
+def is_rejected_status(status: str) -> bool:
+    collapsed = status.strip().lower().replace("→", "->")
+    collapsed = "->".join(part.strip() for part in collapsed.split("->"))
+    return collapsed in {"rejected", "oa->rejected", "interview->rejected"}
 
 ROOT = Path(__file__).resolve().parent.parent
 OUTPUT_PATH = ROOT / "src" / "data" / "data.json"
@@ -95,7 +110,9 @@ def compute_stats(applications: list[dict]) -> dict:
     }
     for app in applications:
         status = app.get("status", "")
-        if status in counts:
+        if is_rejected_status(status):
+            counts["Rejected"] += 1
+        elif status in counts:
             counts[status] += 1
 
     def rate(count: int) -> float:

@@ -1,5 +1,6 @@
 const GIS_SRC = 'https://accounts.google.com/gsi/client'
-const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets.readonly'
+// Full Sheets scope so dashboard can update Status cells
+const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets'
 const PROFILE_SCOPES = 'openid email profile'
 const SCOPES = `${SHEETS_SCOPE} ${PROFILE_SCOPES}`
 
@@ -17,7 +18,9 @@ function loadGis(): Promise<void> {
     const existing = document.querySelector<HTMLScriptElement>(`script[src="${GIS_SRC}"]`)
     if (existing) {
       existing.addEventListener('load', () => resolve())
-      existing.addEventListener('error', () => reject(new Error('Failed to load Google Identity Services')))
+      existing.addEventListener('error', () =>
+        reject(new Error('Failed to load Google Identity Services')),
+      )
       return
     }
 
@@ -37,6 +40,12 @@ export interface GoogleUser {
   name: string
 }
 
+export interface AccessTokenResult {
+  accessToken: string
+  /** Lifetime in seconds (Google typically returns ~3600). */
+  expiresIn: number
+}
+
 export async function fetchUserProfile(accessToken: string): Promise<GoogleUser> {
   const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
     headers: { Authorization: `Bearer ${accessToken}` },
@@ -54,7 +63,10 @@ export async function fetchUserProfile(accessToken: string): Promise<GoogleUser>
   }
 }
 
-export async function requestGoogleAccessToken(clientId: string): Promise<string> {
+export async function requestGoogleAccessToken(
+  clientId: string,
+  options?: { prompt?: '' | 'none' | 'consent' | 'select_account' },
+): Promise<AccessTokenResult> {
   await loadGis()
   if (!window.google?.accounts?.oauth2) {
     throw new Error('Google Identity Services unavailable')
@@ -73,15 +85,17 @@ export async function requestGoogleAccessToken(clientId: string): Promise<string
           )
           return
         }
-        resolve(response.access_token)
+        resolve({
+          accessToken: response.access_token,
+          expiresIn: Number(response.expires_in) || 3600,
+        })
       },
       error_callback: (error) => {
         reject(new Error(error.message || error.type || 'Google sign-in failed'))
       },
     })
 
-    // Empty prompt reuses a granted session when possible; first visit still shows consent.
-    client.requestAccessToken({ prompt: '' })
+    client.requestAccessToken({ prompt: options?.prompt ?? '' })
   })
 }
 

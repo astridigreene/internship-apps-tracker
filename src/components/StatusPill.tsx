@@ -1,9 +1,13 @@
+import { isRejectedStatus } from '../types'
+
 const STATUS_STYLES: Record<string, string> = {
-  Applied: 'bg-[#e5e5e5] text-[#3e3e3c]',
-  OA: 'bg-[#d8e6fe] text-[#032d60]',
-  Interview: 'bg-[#f9e3b6] text-[#8c4b02]',
-  Offer: 'bg-[#cdefc4] text-[#194e31]',
-  Rejected: 'bg-[#fddde3] text-[#8e030f]',
+  Applied: 'bg-status-applied-bg text-status-applied-text',
+  OA: 'bg-status-oa-bg text-status-oa-text',
+  Interview: 'bg-status-interview-bg text-status-interview-text',
+  Offer: 'bg-status-offer-bg text-status-offer-text',
+  Rejected: 'bg-status-rejected-bg text-status-rejected-text',
+  'OA->Rejected': 'bg-status-rejected-bg text-status-rejected-text',
+  'Interview->Rejected': 'bg-status-rejected-bg text-status-rejected-text',
 }
 
 interface StatusPillProps {
@@ -11,10 +15,12 @@ interface StatusPillProps {
 }
 
 export function StatusPill({ status }: StatusPillProps) {
-  const styles = STATUS_STYLES[status] ?? 'bg-[#e5e5e5] text-[#3e3e3c]'
+  const styles = isRejectedStatus(status)
+    ? STATUS_STYLES.Rejected
+    : (STATUS_STYLES[status] ?? 'bg-status-applied-bg text-status-applied-text')
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ${styles}`}
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[12px] leading-4 font-bold whitespace-nowrap ${styles}`}
     >
       {status}
     </span>

@@ -1,113 +1,167 @@
+import { useEffect, useState } from 'react'
 import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts'
 import type { Application } from '../types'
+import { isRejectedStatus } from '../types'
 
 interface StatusFunnelProps {
   applications: Application[]
+  fill?: boolean
 }
 
-const STAGES = ['Applied', 'OA', 'Interview', 'Offer'] as const
+const STAGES = ['OA', 'Interview', 'Offer', 'Rejected'] as const
 
-export function StatusFunnel({ applications }: StatusFunnelProps) {
-  const counts: Record<(typeof STAGES)[number], number> = {
-    Applied: 0,
+const STAGE_COLORS_LIGHT: Record<(typeof STAGES)[number], string> = {
+  OA: '#3b82f6',
+  Interview: '#f97316',
+  Offer: '#10b981',
+  Rejected: '#f43f5e',
+}
+
+const STAGE_COLORS_DARK: Record<(typeof STAGES)[number], string> = {
+  OA: '#60a5fa',
+  Interview: '#fb923c',
+  Offer: '#34d399',
+  Rejected: '#fb7185',
+}
+
+const STAGE_FOOTER: Record<(typeof STAGES)[number], string> = {
+  OA: 'bg-status-oa-bg text-status-oa-text',
+  Interview: 'bg-status-interview-bg text-status-interview-text',
+  Offer: 'bg-status-offer-bg text-status-offer-text',
+  Rejected: 'bg-status-rejected-bg text-status-rejected-text',
+}
+
+function usePrefersDark() {
+  const [dark, setDark] = useState(() =>
+    typeof window !== 'undefined'
+      ? window.matchMedia('(prefers-color-scheme: dark)').matches
+      : false,
+  )
+
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    const onChange = () => setDark(mq.matches)
+    onChange()
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+
+  return dark
+}
+
+function cssVar(name: string, fallback: string) {
+  if (typeof window === 'undefined') {
+    return fallback
+  }
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+  return value || fallback
+}
+
+export function StatusFunnel({ applications, fill }: StatusFunnelProps) {
+  const dark = usePrefersDark()
+  const stageColors = dark ? STAGE_COLORS_DARK : STAGE_COLORS_LIGHT
+
+  const current = {
     OA: 0,
     Interview: 0,
     Offer: 0,
+    Rejected: 0,
   }
 
   for (const app of applications) {
-    if (app.status in counts) {
-      counts[app.status as (typeof STAGES)[number]] += 1
+    if (isRejectedStatus(app.status)) {
+      current.Rejected += 1
+      continue
+    }
+    if (app.status in current) {
+      current[app.status as keyof typeof current] += 1
     }
   }
 
-  // Cumulative: everyone who reached at least this stage (offer counts toward interview, OA, applied)
-  const chartData = [
-    {
-      stage: 'Applied',
-      count: counts.Applied + counts.OA + counts.Interview + counts.Offer,
-    },
-    {
-      stage: 'OA',
-      count: counts.OA + counts.Interview + counts.Offer,
-    },
-    {
-      stage: 'Interview',
-      count: counts.Interview + counts.Offer,
-    },
-    {
-      stage: 'Offer',
-      count: counts.Offer,
-    },
-  ]
+  const chartData = STAGES.map((stage) => ({
+    stage,
+    count: current[stage],
+  }))
+
+  const grid = cssVar('--color-chart-grid', '#d5e4ea')
+  const tick = cssVar('--color-chart-tick', '#5b7c86')
+  const cursor = cssVar('--color-chart-cursor', '#f0fdfa')
+  const tooltipBorder = cssVar('--color-chart-tooltip-border', '#99f6e4')
+  const surface = cssVar('--color-app-surface', '#fff')
+  const text = cssVar('--color-app-text', '#134e4a')
 
   return (
-    <div className="rounded-[2px] border border-slds-border bg-slds-surface">
-      <div className="border-b border-slds-border px-4 py-3">
-        <h2 className="text-sm font-bold text-slds-text">Status Funnel</h2>
-        <p className="mt-0.5 text-xs text-slds-text-weak">
-          Cumulative reach: Applied → OA → Interview → Offer (excludes Rejected)
-        </p>
+    <div
+      className={[
+        'flex min-h-0 flex-col overflow-hidden rounded-md border border-panel-border bg-app-surface',
+        fill ? 'h-full' : '',
+      ].join(' ')}
+    >
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-app-border bg-app-muted px-2.5 py-1.5">
+        <h2 className="text-[12px] font-semibold text-panel-title">Pipeline</h2>
+        <p className="text-[10px] text-panel-sub/80">Current status counts</p>
       </div>
-      <div className="h-64 px-2 py-4">
+      <div className={fill ? 'min-h-0 flex-1 px-1.5 py-2' : 'h-44 px-2 py-3'}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={chartData}
-            margin={{ top: 8, right: 16, left: 0, bottom: 0 }}
+            margin={{ top: 4, right: 12, left: 0, bottom: 0 }}
             barCategoryGap="28%"
           >
-            <CartesianGrid stroke="#dddbda" strokeDasharray="0" vertical={false} />
+            <CartesianGrid stroke={grid} strokeDasharray="0" vertical={false} />
             <XAxis
               dataKey="stage"
-              tick={{ fill: '#706e6b', fontSize: 12 }}
-              axisLine={{ stroke: '#dddbda' }}
+              tick={{ fill: tick, fontSize: 12 }}
+              axisLine={{ stroke: grid }}
               tickLine={false}
             />
             <YAxis
               allowDecimals={false}
-              tick={{ fill: '#706e6b', fontSize: 12 }}
+              tick={{ fill: tick, fontSize: 12 }}
               axisLine={false}
               tickLine={false}
-              width={36}
+              width={22}
             />
             <Tooltip
-              cursor={{ fill: '#f3f2f2' }}
+              cursor={{ fill: cursor }}
               contentStyle={{
-                border: '1px solid #dddbda',
-                borderRadius: 2,
+                background: surface,
+                color: text,
+                border: `1px solid ${tooltipBorder}`,
+                borderRadius: 6,
                 fontSize: 12,
                 boxShadow: 'none',
+                padding: '6px 8px',
               }}
               formatter={(value, _name, item) => {
-                const stage = String(item?.payload?.stage ?? '') as (typeof STAGES)[number]
-                const current = counts[stage] ?? 0
-                return [
-                  `${value as number} reached · ${current} currently here`,
-                  'Count',
-                ]
+                const stage = String(item?.payload?.stage ?? '')
+                return [`${value as number} current`, stage]
               }}
             />
-            <Bar dataKey="count" fill="#0176d3" radius={[2, 2, 0, 0]} maxBarSize={64} />
+            <Bar dataKey="count" radius={[3, 3, 0, 0]} maxBarSize={56}>
+              {chartData.map((entry) => (
+                <Cell key={entry.stage} fill={stageColors[entry.stage]} />
+              ))}
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>
-      <div className="grid grid-cols-4 gap-px border-t border-slds-border bg-slds-border">
+      <div className="grid shrink-0 grid-cols-4 gap-px border-t border-app-border bg-app-border">
         {STAGES.map((stage) => (
-          <div key={stage} className="bg-slds-surface px-3 py-2 text-center">
-            <p className="text-[11px] font-bold tracking-wider text-slds-text-weak uppercase">
+          <div key={stage} className={`px-1.5 py-1 text-center ${STAGE_FOOTER[stage]}`}>
+            <p className="text-[9px] font-semibold tracking-[0.06em] uppercase opacity-80">
               {stage}
             </p>
-            <p className="text-sm font-semibold text-slds-text tabular-nums">
-              {counts[stage]}
-            </p>
+            <p className="text-[12px] font-bold tabular-nums">{current[stage]}</p>
           </div>
         ))}
       </div>
