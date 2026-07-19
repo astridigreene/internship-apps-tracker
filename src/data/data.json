@@ -1,0 +1,156 @@
+{
+  "lastSynced": "2026-07-19T20:00:00.000Z",
+  "stats": {
+    "totalApplications": 20,
+    "rejections": 5,
+    "oas": 5,
+    "interviews": 4,
+    "offers": 2,
+    "rejectionRate": 25.0,
+    "oaRate": 25.0,
+    "interviewRate": 20.0,
+    "offerRate": 10.0
+  },
+  "applications": [
+    {
+      "company": "Stripe",
+      "location": "San Francisco, CA",
+      "role": "Software Engineering Intern",
+      "dateApplied": "2026-01-15",
+      "status": "Interview"
+    },
+    {
+      "company": "Google",
+      "location": "Mountain View, CA",
+      "role": "STEP Intern",
+      "dateApplied": "2026-01-12",
+      "status": "OA"
+    },
+    {
+      "company": "Meta",
+      "location": "Menlo Park, CA",
+      "role": "Software Engineer Intern",
+      "dateApplied": "2026-01-10",
+      "status": "Rejected"
+    },
+    {
+      "company": "Airbnb",
+      "location": "San Francisco, CA",
+      "role": "Software Engineering Intern",
+      "dateApplied": "2026-01-08",
+      "status": "Offer"
+    },
+    {
+      "company": "Jane Street",
+      "location": "New York, NY",
+      "role": "Trading Intern",
+      "dateApplied": "2026-01-05",
+      "status": "OA"
+    },
+    {
+      "company": "Apple",
+      "location": "Cupertino, CA",
+      "role": "Software Engineering Intern",
+      "dateApplied": "2026-01-03",
+      "status": "Applied"
+    },
+    {
+      "company": "Amazon",
+      "location": "Seattle, WA",
+      "role": "SDE Intern",
+      "dateApplied": "2025-12-20",
+      "status": "Rejected"
+    },
+    {
+      "company": "Netflix",
+      "location": "Los Gatos, CA",
+      "role": "Software Engineering Intern",
+      "dateApplied": "2025-12-18",
+      "status": "Interview"
+    },
+    {
+      "company": "Microsoft",
+      "location": "Redmond, WA",
+      "role": "Software Engineering Intern",
+      "dateApplied": "2025-12-15",
+      "status": "OA"
+    },
+    {
+      "company": "NVIDIA",
+      "location": "Santa Clara, CA",
+      "role": "Software Engineering Intern",
+      "dateApplied": "2025-12-10",
+      "status": "Applied"
+    },
+    {
+      "company": "Databricks",
+      "location": "San Francisco, CA",
+      "role": "Software Engineering Intern",
+      "dateApplied": "2025-12-08",
+      "status": "Interview"
+    },
+    {
+      "company": "Snowflake",
+      "location": "Bozeman, MT",
+      "role": "Software Engineering Intern",
+      "dateApplied": "2025-12-05",
+      "status": "Rejected"
+    },
+    {
+      "company": "Salesforce",
+      "location": "San Francisco, CA",
+      "role": "Software Engineering Intern",
+      "dateApplied": "2025-12-01",
+      "status": "Offer"
+    },
+    {
+      "company": "Uber",
+      "location": "San Francisco, CA",
+      "role": "Software Engineering Intern",
+      "dateApplied": "2025-11-28",
+      "status": "Applied"
+    },
+    {
+      "company": "LinkedIn",
+      "location": "Sunnyvale, CA",
+      "role": "Software Engineering Intern",
+      "dateApplied": "2025-11-25",
+      "status": "Rejected"
+    },
+    {
+      "company": "Dropbox",
+      "location": "San Francisco, CA",
+      "role": "Software Engineering Intern",
+      "dateApplied": "2025-11-20",
+      "status": "OA"
+    },
+    {
+      "company": "Palantir",
+      "location": "Denver, CO",
+      "role": "Forward Deployed Engineer Intern",
+      "dateApplied": "2025-11-15",
+      "status": "Interview"
+    },
+    {
+      "company": "Bloomberg",
+      "location": "New York, NY",
+      "role": "Software Engineering Intern",
+      "dateApplied": "2025-11-10",
+      "status": "Rejected"
+    },
+    {
+      "company": "Two Sigma",
+      "location": "New York, NY",
+      "role": "Software Engineering Intern",
+      "dateApplied": "2025-11-05",
+      "status": "OA"
+    },
+    {
+      "company": "Cloudflare",
+      "location": "Austin, TX",
+      "role": "Software Engineering Intern",
+      "dateApplied": "2025-11-01",
+      "status": "Applied"
+    }
+  ]
+}
