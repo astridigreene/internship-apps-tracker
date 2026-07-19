@@ -6,6 +6,7 @@ interface TopBarProps {
   userEmail?: string | null
   onRefresh?: () => void
   onSignOut?: () => void
+  onChangeSheet?: () => void
   onHome?: () => void
   refreshing?: boolean
   nav?: ReactNode
@@ -33,6 +34,7 @@ export function TopBar({
   userEmail,
   onRefresh,
   onSignOut,
+  onChangeSheet,
   onHome,
   refreshing,
   nav,
@@ -86,6 +88,15 @@ export function TopBar({
                 <path d="M21 12a9 9 0 1 1-2.64-6.36" />
                 <path d="M21 3v6h-6" />
               </svg>
+            </button>
+          ) : null}
+          {onChangeSheet ? (
+            <button
+              type="button"
+              onClick={onChangeSheet}
+              className="h-7 rounded border border-white/30 bg-white/15 px-2 text-[12px] font-medium text-white hover:bg-white/25"
+            >
+              Sheet
             </button>
           ) : null}
           {onSignOut ? (

@@ -17,13 +17,12 @@ export function LoginScreen({ configured, loading, error, onSignIn }: LoginScree
         </div>
         <div className="p-4">
           <p className="text-[12px] text-app-text-weak">
-            Sign in with the Google account that can access your private spreadsheet.
+            Sign in with Google, then connect the spreadsheet your account can access.
           </p>
 
           {!configured ? (
             <p className="mt-3 rounded border border-app-border bg-app-muted px-2 py-1.5 text-[11px] text-app-text">
-              Missing <code className="text-[10px]">VITE_GOOGLE_CLIENT_ID</code> or{' '}
-              <code className="text-[10px]">VITE_SHEET_ID</code>.
+              Missing <code className="text-[10px]">VITE_GOOGLE_CLIENT_ID</code>.
             </p>
           ) : (
             <button

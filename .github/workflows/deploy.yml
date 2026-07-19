@@ -36,10 +36,8 @@ jobs:
         run: npm run build
         env:
           VITE_BASE_PATH: /${{ github.event.repository.name }}/
-          # Public OAuth client ID + Sheet ID (access still gated by Google account / Sheet ACL).
-          # Allowed email is hardcoded in src/lib/config.ts (astridig@umich.edu).
+          # OAuth Web client ID only. Each visitor connects their own spreadsheet after sign-in.
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
-          VITE_SHEET_ID: ${{ secrets.VITE_SHEET_ID }}
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

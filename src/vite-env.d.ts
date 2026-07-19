@@ -2,8 +2,7 @@
 
 interface ImportMetaEnv {
   readonly VITE_GOOGLE_CLIENT_ID: string
-  readonly VITE_SHEET_ID: string
-  readonly VITE_ALLOWED_EMAIL: string
+  readonly VITE_SHEET_ID?: string
   readonly VITE_BASE_PATH: string
 }
 
