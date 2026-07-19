@@ -58,17 +58,18 @@ export function ApplicationDetailModal({
     return null
   }
 
-  const currentStatus = app.status
+  const current = app
+  const currentStatus = current.status
   const next = nextPipelineStatus(currentStatus)
   const rejectTarget = rejectionStatusFor(currentStatus)
   const alreadyRejected = isRejectedStatus(currentStatus)
   const canWrite = Boolean(onUpdateStatus)
   const isOaStatus = currentStatus === 'OA'
   const canEditOaComplete =
-    Boolean(onUpdateOaComplete) && app.oaComplete !== null && isOaStatus
+    Boolean(onUpdateOaComplete) && current.oaComplete !== null && isOaStatus
   const showOaCompleteButton =
-    canEditOaComplete && isOaIncomplete(app.oaComplete)
-  const showOaCompleteField = app.oaComplete !== null && isOaStatus
+    canEditOaComplete && isOaIncomplete(current.oaComplete)
+  const showOaCompleteField = current.oaComplete !== null && isOaStatus
 
   async function writeStatus(toStatus: ApplicationStatus) {
     if (!onUpdateStatus || saving || toStatus === currentStatus) {
@@ -76,7 +77,7 @@ export function ApplicationDetailModal({
     }
     setError(null)
     try {
-      await onUpdateStatus(app, toStatus)
+      await onUpdateStatus(current, toStatus)
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not update status')
@@ -84,12 +85,12 @@ export function ApplicationDetailModal({
   }
 
   async function writeOaComplete(value: OaComplete) {
-    if (!onUpdateOaComplete || saving || app.oaComplete === value) {
+    if (!onUpdateOaComplete || saving || current.oaComplete === value) {
       return
     }
     setError(null)
     try {
-      await onUpdateOaComplete(app, value)
+      await onUpdateOaComplete(current, value)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not update OA Complete')
     }
