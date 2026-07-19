@@ -1,11 +1,80 @@
 import {
   isRejectedStatus,
+  normalizeOaComplete,
   type Application,
   type NewApplicationInput,
+  type OaComplete,
   type SheetColumns,
   type Stats,
   type TrackerData,
 } from '../types'
+
+/** Required header labels shown in setup help. */
+export const REQUIRED_COLUMN_GUIDE = [
+  { label: 'Company', hint: 'Also accepts: Employer, Organization' },
+  { label: 'Location', hint: 'Also accepts: Loc, City, Office' },
+  { label: 'Role', hint: 'Also accepts: Position, Title, Job' },
+  { label: 'Date Applied', hint: 'Also accepts: Applied, Applied On' },
+  { label: 'Status', hint: 'Also accepts: Stage, Result, Outcome' },
+] as const
+
+/** Optional headers — app works without them, with reduced features. */
+export const OPTIONAL_COLUMN_GUIDE = [
+  {
+    label: 'Last Updated',
+    hint: 'Stamped when status changes; powers “days since” on the OA card',
+  },
+  {
+    label: 'OA Complete',
+    hint: 'Values: N/A, N, or Y — incomplete OAs (N) show on the OA card',
+  },
+] as const
+
+export type SheetSetupReason = 'empty' | 'missing-columns' | 'no-year-tabs'
+
+export interface SheetSetupDetails {
+  reason: SheetSetupReason
+  missing?: string[]
+  foundHeaders?: string[]
+  yearTab?: string
+}
+
+/** Recoverable spreadsheet setup problem — show directions, don’t treat as a crash. */
+export class SheetSetupError extends Error {
+  readonly code = 'SHEET_SETUP' as const
+  readonly details: SheetSetupDetails
+
+  constructor(details: SheetSetupDetails) {
+    super(sheetSetupSummary(details))
+    this.name = 'SheetSetupError'
+    this.details = details
+  }
+}
+
+export function isSheetSetupError(err: unknown): err is SheetSetupError {
+  return (
+    err instanceof SheetSetupError ||
+    (typeof err === 'object' &&
+      err !== null &&
+      (err as { code?: string }).code === 'SHEET_SETUP' &&
+      typeof (err as { details?: unknown }).details === 'object')
+  )
+}
+
+function sheetSetupSummary(details: SheetSetupDetails): string {
+  switch (details.reason) {
+    case 'empty':
+      return 'This year tab is empty. Add a header row with the required column names.'
+    case 'no-year-tabs':
+      return 'No year tabs found. Rename a sheet tab to a four-digit year like 2027.'
+    case 'missing-columns': {
+      const missing = details.missing?.join(', ') || 'required columns'
+      return `Missing required columns: ${missing}. Add them as the first-row headers.`
+    }
+    default:
+      return 'This spreadsheet needs a small setup fix before it can be used.'
+  }
+}
 
 /** Canonical field → accepted header aliases (normalized). */
 const HEADER_ALIASES: Record<string, string[]> = {
@@ -23,6 +92,13 @@ const HEADER_ALIASES: Record<string, string[]> = {
     'oa sent',
     'oa date',
     'date oa',
+  ],
+  oaComplete: [
+    'oa complete',
+    'oacomplete',
+    'oa completed',
+    'oa done',
+    'completed oa',
   ],
 }
 
@@ -132,9 +208,7 @@ export async function listYearSheets(
     .sort((a, b) => Number(b) - Number(a))
 
   if (!years.length) {
-    throw new Error(
-      'No year tabs found. Name spreadsheet tabs like "2027" or "2026" (exactly four digits).',
-    )
+    throw new SheetSetupError({ reason: 'no-year-tabs' })
   }
 
   return years
@@ -145,9 +219,11 @@ export function parseSheetValues(values: string[][]): {
   columns: SheetColumns
 } {
   if (!values.length) {
-    throw new Error(
-      'Sheet is empty. Add a header row: Company, Location, Role, Date Applied, Status, Last Updated',
-    )
+    throw new SheetSetupError({
+      reason: 'empty',
+      foundHeaders: [],
+      missing: REQUIRED_COLUMN_GUIDE.map((c) => c.label),
+    })
   }
 
   const headers = values[0].map((h) => String(h ?? '').trim())
@@ -165,6 +241,7 @@ export function parseSheetValues(values: string[][]): {
     dateApplied: resolveColumnIndex(headerMap, 'dateApplied'),
     status: resolveColumnIndex(headerMap, 'status'),
     lastUpdated: resolveColumnIndex(headerMap, 'lastUpdated'),
+    oaComplete: resolveColumnIndex(headerMap, 'oaComplete'),
   }
 
   const missingLabels: string[] = []
@@ -182,11 +259,13 @@ export function parseSheetValues(values: string[][]): {
     resolved.dateApplied === undefined ||
     resolved.status === undefined
   ) {
-    const found = headers.filter(Boolean).join(', ') || '(none)'
-    throw new Error(
-      `Sheet is missing required columns: ${missingLabels.join(', ')}. ` +
-        `Found headers in row 1: ${found}.`,
-    )
+    throw new SheetSetupError({
+      reason: values.every((row) => row.every((cell) => !String(cell ?? '').trim()))
+        ? 'empty'
+        : 'missing-columns',
+      missing: missingLabels,
+      foundHeaders: headers.filter(Boolean),
+    })
   }
 
   const columns: SheetColumns = {
@@ -196,6 +275,7 @@ export function parseSheetValues(values: string[][]): {
     dateApplied: resolved.dateApplied,
     status: resolved.status,
     lastUpdated: resolved.lastUpdated ?? null,
+    oaComplete: resolved.oaComplete ?? null,
   }
 
   const cellAt = (row: string[], idx: number | undefined) =>
@@ -210,6 +290,10 @@ export function parseSheetValues(values: string[][]): {
     const dateApplied = cellAt(row, columns.dateApplied)
     const status = normalizeStatus(cellAt(row, columns.status))
     const lastUpdated = cellAt(row, columns.lastUpdated ?? undefined) || null
+    const oaComplete =
+      columns.oaComplete === null
+        ? null
+        : normalizeOaComplete(cellAt(row, columns.oaComplete))
 
     if (!company && !role && !status) {
       continue
@@ -222,6 +306,7 @@ export function parseSheetValues(values: string[][]): {
       dateApplied,
       status,
       lastUpdated,
+      oaComplete,
       sheetRow: i + 1,
     })
   }
@@ -431,6 +516,30 @@ export async function updateSheetStatus(options: {
   return { ...options.columns, lastUpdated: lastUpdatedCol }
 }
 
+/** Update OA Complete cell (N/A, N, or Y). */
+export async function updateSheetOaComplete(options: {
+  spreadsheetId: string
+  accessToken: string
+  sheetTitle: string
+  sheetRow: number
+  columns: SheetColumns
+  oaComplete: OaComplete
+}): Promise<void> {
+  if (options.columns.oaComplete === null) {
+    throw new Error(
+      'This sheet has no "OA Complete" column. Add a header named OA Complete with values N/A, N, or Y.',
+    )
+  }
+
+  await putSheetValues({
+    spreadsheetId: options.spreadsheetId,
+    accessToken: options.accessToken,
+    sheetTitle: options.sheetTitle,
+    startCell: `${columnLetter(options.columns.oaComplete)}${options.sheetRow}`,
+    values: [[options.oaComplete]],
+  })
+}
+
 function assertCompleteApplication(input: NewApplicationInput): NewApplicationInput {
   const company = input.company.trim()
   const location = input.location.trim()
@@ -481,6 +590,7 @@ export async function appendSheetApplication(options: {
     columns.dateApplied,
     columns.status,
     columns.lastUpdated ?? 0,
+    columns.oaComplete ?? 0,
   )
   const row = Array.from({ length: width + 1 }, () => '')
   row[columns.company] = app.company
@@ -490,6 +600,9 @@ export async function appendSheetApplication(options: {
   row[columns.status] = app.status
   if (columns.lastUpdated !== null) {
     row[columns.lastUpdated] = options.lastUpdatedStamp
+  }
+  if (columns.oaComplete !== null) {
+    row[columns.oaComplete] = app.status === 'OA' ? 'N' : 'N/A'
   }
 
   const range = a1RangeForSheet(options.sheetTitle, 'A:Z')

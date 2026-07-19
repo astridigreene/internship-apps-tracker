@@ -8,7 +8,7 @@
  * Apps Script Properties Service only.
  */
 
-var OWNER = "OWNER"; // e.g. "astridgreene"
+var OWNER = "OWNER"; // e.g. "your-github-username"
 var REPO = "REPO"; // e.g. "internship-apps-dashboard"
 
 var REQUIRED_COLUMNS = ["Company", "Location", "Role", "Date Applied", "Status"];

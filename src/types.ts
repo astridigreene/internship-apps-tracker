@@ -69,6 +69,71 @@ export function isForwardProgress(fromStatus: string, toStatus: string): boolean
   return statusRank(toStatus) > statusRank(fromStatus)
 }
 
+function normalizeStatusKey(status: string): string {
+  return status
+    .trim()
+    .toLowerCase()
+    .replace(/\s*(?:→|->|➜|⇒)\s*/g, '->')
+}
+
+/** Next pipeline stage, or null if already at Offer / rejected / unknown. */
+export function nextPipelineStatus(status: string): ApplicationStatus | null {
+  switch (normalizeStatusKey(status)) {
+    case 'applied':
+      return 'OA'
+    case 'oa':
+      return 'Interview'
+    case 'interview':
+      return 'Offer'
+    default:
+      return null
+  }
+}
+
+/**
+ * Rejection status that matches the current stage
+ * (OA → OA->Rejected, Interview → Interview->Rejected, else Rejected).
+ */
+export function rejectionStatusFor(status: string): ApplicationStatus {
+  const normalized = normalizeStatusKey(status)
+  if (normalized === 'oa') {
+    return 'OA->Rejected'
+  }
+  if (normalized === 'interview') {
+    return 'Interview->Rejected'
+  }
+  if (isRejectedStatus(status)) {
+    if (normalized === 'oa->rejected') {
+      return 'OA->Rejected'
+    }
+    if (normalized === 'interview->rejected') {
+      return 'Interview->Rejected'
+    }
+    return 'Rejected'
+  }
+  return 'Rejected'
+}
+
+export type OaComplete = 'N/A' | 'N' | 'Y'
+
+export const OA_COMPLETE_VALUES: OaComplete[] = ['N/A', 'N', 'Y']
+
+export function normalizeOaComplete(raw: string): OaComplete {
+  const value = raw.trim().toUpperCase().replace(/\s+/g, '')
+  if (value === 'Y' || value === 'YES') {
+    return 'Y'
+  }
+  if (value === 'N' || value === 'NO') {
+    return 'N'
+  }
+  return 'N/A'
+}
+
+/** True when this OA still needs to be completed (OA Complete === N). */
+export function isOaIncomplete(oaComplete: OaComplete | null): boolean {
+  return oaComplete === 'N'
+}
+
 export interface Application {
   company: string
   location: string
@@ -77,6 +142,11 @@ export interface Application {
   status: ApplicationStatus | string
   /** When status last changed (from Last Updated column), if present. */
   lastUpdated: string | null
+  /**
+   * OA Complete column (N/A, N, Y).
+   * null when the sheet has no OA Complete column.
+   */
+  oaComplete: OaComplete | null
   /** 1-based row number in the Google Sheet tab (includes header offset). */
   sheetRow: number
 }
@@ -97,6 +167,7 @@ export interface SheetColumns {
   dateApplied: number
   status: number
   lastUpdated: number | null
+  oaComplete: number | null
 }
 
 export interface Stats {

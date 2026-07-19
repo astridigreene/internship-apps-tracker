@@ -1,16 +1,17 @@
 import { useMemo } from 'react'
-import type { Application } from '../types'
+import { isOaIncomplete, type Application } from '../types'
 import { formatElapsedDays, parseSheetDate } from '../lib/time'
 
 interface OaCardProps {
   applications: Application[]
   onOpenAll?: () => void
+  onSelectApplication?: (app: Application) => void
 }
 
-export function OaCard({ applications, onOpenAll }: OaCardProps) {
+export function OaCard({ applications, onOpenAll, onSelectApplication }: OaCardProps) {
   const oaApps = useMemo(() => {
     return applications
-      .filter((app) => app.status === 'OA')
+      .filter((app) => app.status === 'OA' && isOaIncomplete(app.oaComplete))
       .slice()
       .sort((a, b) => {
         const aTime = parseSheetDate(a.lastUpdated ?? '')?.getTime() ?? 0
@@ -54,26 +55,36 @@ export function OaCard({ applications, onOpenAll }: OaCardProps) {
         <ul className="min-h-0 flex-1 overflow-y-auto">
           {oaApps.map((app) => {
             const elapsed = formatElapsedDays(parseSheetDate(app.lastUpdated ?? ''))
+            const interactive = Boolean(onSelectApplication)
             return (
-              <li
-                key={app.sheetRow}
-                className="flex items-center justify-between gap-2 border-b border-kpi-oa-border/40 px-2.5 py-1.5 last:border-b-0"
-              >
-                <p className="min-w-0 truncate text-[12px] font-semibold text-kpi-oa-text">
-                  {app.company || 'Untitled'}
-                  {app.role ? (
-                    <span className="font-normal text-app-text-weak"> · {app.role}</span>
-                  ) : null}
-                </p>
-                <p
+              <li key={app.sheetRow} className="last:border-b-0">
+                <button
+                  type="button"
+                  disabled={!interactive}
+                  onClick={() => onSelectApplication?.(app)}
                   className={[
-                    'shrink-0 text-[11px] font-semibold tabular-nums',
-                    app.lastUpdated ? 'text-kpi-oa-text' : 'text-app-text-weak',
+                    'flex w-full items-center justify-between gap-2 border-b border-kpi-oa-border/40 px-2.5 py-1.5 text-left',
+                    interactive
+                      ? 'cursor-pointer hover:bg-kpi-oa-border/15'
+                      : 'cursor-default',
                   ].join(' ')}
-                  title={app.lastUpdated ?? undefined}
                 >
-                  {elapsed}
-                </p>
+                  <p className="min-w-0 truncate text-[12px] font-semibold text-kpi-oa-text">
+                    {app.company || 'Untitled'}
+                    {app.role ? (
+                      <span className="font-normal text-app-text-weak"> · {app.role}</span>
+                    ) : null}
+                  </p>
+                  <p
+                    className={[
+                      'shrink-0 text-[11px] font-semibold tabular-nums',
+                      app.lastUpdated ? 'text-kpi-oa-text' : 'text-app-text-weak',
+                    ].join(' ')}
+                    title={app.lastUpdated ?? undefined}
+                  >
+                    {elapsed}
+                  </p>
+                </button>
               </li>
             )
           })}
