@@ -47,7 +47,9 @@ function stampStatusUpdated(e) {
     sheet.getRange(1, updatedCol + 1).setValue(LAST_UPDATED_HEADER)
   }
 
-  sheet.getRange(row, updatedCol + 1).setValue(new Date())
+  sheet.getRange(row, updatedCol + 1).setValue(
+    Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'M/d/yyyy'),
+  )
 }
 
 function _findHeaderColumn_(headers, name) {

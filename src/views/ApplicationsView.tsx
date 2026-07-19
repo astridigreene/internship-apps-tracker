@@ -12,6 +12,7 @@ import { NewApplicationModal } from '../components/NewApplicationModal'
 import { DeleteConfirmModal } from '../components/DeleteConfirmModal'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { ApplicationDetailModal } from '../components/ApplicationDetailModal'
+import { formatDisplayDate } from '../lib/time'
 
 type SortKey = 'company' | 'location' | 'role' | 'dateApplied' | 'status'
 type SortDir = 'asc' | 'desc'
@@ -539,7 +540,7 @@ export function ApplicationsView({
                     </td>
                     <td className="truncate px-3 py-0 font-semibold text-app-text">{app.role}</td>
                     <td className="px-3 py-0 font-semibold whitespace-nowrap text-app-text tabular-nums">
-                      {app.dateApplied}
+                      {formatDisplayDate(app.dateApplied) || app.dateApplied}
                     </td>
                     <td
                       className="px-3 py-0"

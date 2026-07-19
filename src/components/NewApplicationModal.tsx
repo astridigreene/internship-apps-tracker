@@ -4,6 +4,7 @@ import {
   type ApplicationStatus,
   type NewApplicationInput,
 } from '../types'
+import { formatDisplayDate } from '../lib/time'
 
 interface NewApplicationModalProps {
   open: boolean
@@ -86,7 +87,7 @@ export function NewApplicationModal({
         company: form.company.trim(),
         location: form.location.trim(),
         role: form.role.trim(),
-        dateApplied: form.dateApplied.trim(),
+        dateApplied: formatDisplayDate(form.dateApplied.trim()) || form.dateApplied.trim(),
         status: form.status,
       })
     } catch (err) {

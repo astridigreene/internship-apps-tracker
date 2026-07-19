@@ -11,6 +11,7 @@ import {
 } from '../types'
 import { StatusPill } from './StatusPill'
 import { StatusSelect } from './StatusSelect'
+import { formatDisplayDate } from '../lib/time'
 
 interface ApplicationDetailModalProps {
   app: Application | null
@@ -157,11 +158,15 @@ export function ApplicationDetailModal({
           </div>
           <div>
             <p className={fieldLabel}>Date Applied</p>
-            <p className={`${fieldValue} tabular-nums`}>{app.dateApplied || '—'}</p>
+            <p className={`${fieldValue} tabular-nums`}>
+              {formatDisplayDate(app.dateApplied) || '—'}
+            </p>
           </div>
           <div>
             <p className={fieldLabel}>Last Updated</p>
-            <p className={`${fieldValue} tabular-nums`}>{app.lastUpdated || '—'}</p>
+            <p className={`${fieldValue} tabular-nums`}>
+              {formatDisplayDate(app.lastUpdated) || '—'}
+            </p>
           </div>
           {showOaCompleteField ? (
             <div>

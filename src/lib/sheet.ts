@@ -8,6 +8,7 @@ import {
   type Stats,
   type TrackerData,
 } from '../types'
+import { formatDisplayDate } from './time'
 
 /** Required header labels shown in setup help. */
 export const REQUIRED_COLUMN_GUIDE = [
@@ -287,9 +288,14 @@ export function parseSheetValues(values: string[][]): {
     const company = cellAt(row, columns.company)
     const location = cellAt(row, columns.location)
     const role = cellAt(row, columns.role)
-    const dateApplied = cellAt(row, columns.dateApplied)
+    const dateApplied =
+      formatDisplayDate(cellAt(row, columns.dateApplied)) ||
+      cellAt(row, columns.dateApplied)
     const status = normalizeStatus(cellAt(row, columns.status))
-    const lastUpdated = cellAt(row, columns.lastUpdated ?? undefined) || null
+    const lastUpdatedRaw = cellAt(row, columns.lastUpdated ?? undefined) || null
+    const lastUpdated = lastUpdatedRaw
+      ? formatDisplayDate(lastUpdatedRaw) || lastUpdatedRaw
+      : null
     const oaComplete =
       columns.oaComplete === null
         ? null
@@ -553,7 +559,7 @@ function assertCompleteApplication(input: NewApplicationInput): NewApplicationIn
     )
   }
 
-  return { company, location, role, dateApplied, status }
+  return { company, location, role, dateApplied: formatDisplayDate(dateApplied) || dateApplied, status }
 }
 
 /** Append a complete application row to the year tab. Returns updated columns + sheet row. */
