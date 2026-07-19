@@ -1,114 +1,150 @@
-# Application Tracker
+# Internship Applications Tracker
 
-Static internship dashboard (Vite + React). The repo stays public-safe: **no application rows or credentials are committed**. Visitors sign in with Google; the app then reads your private Sheet with their OAuth token.
+A personal dashboard for tracking internship applications. Sign in with Google, connect a spreadsheet, and manage status updates from the UI.
 
-## How access control works
+Your application rows stay in **your** Google Sheet. The site does not store your data on a server.
 
-1. **Google Sign-In** — OAuth in the browser (Google Identity Services).
-3. **Hardcoded allowlist** — only `astridig@umich.edu` may sign in (see `src/lib/config.ts`).
-4. **Sheet ACL (real gate)** — Keep the spreadsheet private and shared only with that Google account. Other signed-in users get a Sheets API 403 even if they bypass the UI check.
-5. **No baked-in data** — The GitHub Pages build ships an empty shell. Rows are fetched after login and live only in memory.
+**Sheet template (copy this):**  
+[Internship Applications Tracker template](https://docs.google.com/spreadsheets/d/1EW4mMS6pUuRg4xcvVLdUF5jciZsnIaJG8VYYdJJAUNQ/edit?usp=sharing)
 
-Do **not** share the Sheet publicly or with “anyone with the link”.
+> In Google Sheets: **File → Make a copy**. Keep your copy private (or shared only with accounts you trust).
 
-## Stack
+---
 
-- Vite + React + TypeScript + Tailwind CSS
-- Recharts
-- Google Identity Services + Google Sheets API (browser OAuth)
-- GitHub Pages
+## Features
 
-## Local development
+- **Google sign-in** — OAuth in the browser; reconnects on return visits when possible
+- **Your own spreadsheet** — paste a Sheet URL once; the ID is remembered in this browser for your Google account
+- **Year tabs** — tabs named like `2027`, `2026`
+- **Dashboard**
+  - KPI counts (Applied, OA, Interview, Offer, Rejected) with click-through filters
+  - OA card: incomplete OAs only (`Status = OA` and `OA Complete = N`), with days since last update
+  - Pipeline chart
+  - Recent list sorted by **Last Updated** (click a row for details)
+- **Applications table**
+  - Search + clear status filter chips (Active, All, Applied, OA, …)
+  - Row click → detail popup (edit status, advance round, mark rejected, set OA Complete when status is OA)
+  - New application, bulk status edit + save, delete row
+- **Sheet setup help** — if headers/tabs are wrong, the app shows which columns to add instead of failing silently
+- **Dark mode** follows system preference
 
-```bash
-cp .env.example .env.local
-# fill in VITE_GOOGLE_CLIENT_ID and VITE_SHEET_ID
-npm install
-npm run dev
-```
+### Expected columns (row 1 of a year tab)
 
-Only `astridig@umich.edu` can sign in. `.env.local` is gitignored — never commit it.
+| Required | Optional |
+| --- | --- |
+| Company | Last Updated — stamped when status changes |
+| Location | OA Complete — `N/A`, `N`, or `Y` (incomplete OAs show on the OA card) |
+| Role | |
+| Date Applied | |
+| Status | |
 
-## Google Cloud OAuth setup
+**Status values:** `Applied`, `OA`, `Interview`, `Offer`, `Rejected`, `OA->Rejected`, `Interview->Rejected`
 
-1. Open [Google Cloud Console](https://console.cloud.google.com/) → create/select a project.
+The template already includes these headers (and sample year tabs). Use **Make a copy** rather than editing the template itself if you do not own it.
+
+---
+
+## Using a deployed site (end users)
+
+1. Open the tracker URL.
+2. **Sign in with Google** (the same account that can edit your spreadsheet).
+3. If prompted, paste your spreadsheet URL or ID (from your **copy** of the template).
+4. Use the dashboard and Applications tab as usual.
+
+Only people who can open your Sheet in Google can load its data in the tracker. Do **not** share sensitive job-search Sheets as “anyone with the link.”
+
+While the Google Cloud OAuth app is in **Testing**, each Google account must be added as a test user on the consent screen (or the app must be published).
+
+---
+
+## Set up for development or your own deploy
+
+### 1. Spreadsheet
+
+1. Open the [template](https://docs.google.com/spreadsheets/d/1EW4mMS6pUuRg4xcvVLdUF5jciZsnIaJG8VYYdJJAUNQ/edit?usp=sharing).
+2. **File → Make a copy**.
+3. Rename year tabs if needed (`2027`, etc.).
+4. Keep the sheet private / share only with the Google accounts that should use it.
+
+### 2. Google Cloud OAuth
+
+1. [Google Cloud Console](https://console.cloud.google.com/) → create or select a project.
 2. Enable **Google Sheets API**.
-3. **APIs & Services → OAuth consent screen** — configure as External (or Internal if Workspace). Add scopes:
-   - `.../auth/spreadsheets.readonly`
+3. **APIs & Services → OAuth consent screen** — External (or Internal for Workspace). Scopes:
+   - `https://www.googleapis.com/auth/spreadsheets`
    - `email`, `profile`, `openid`
 4. **Credentials → Create credentials → OAuth client ID → Web application**.
 5. Authorized JavaScript origins (examples):
    - `http://localhost:5173`
    - `https://<your-username>.github.io`
-6. Copy the **Client ID** (safe to expose in the frontend).
-7. Create your Google Sheet with headers:
+6. Copy the **Client ID** (this is a public client ID for a browser app — still do not commit private keys or service-account JSON).
 
-   | Company | Location | Role | Date Applied | Status |
-
-   Status values: `Applied`, `OA`, `Interview`, `Offer`, `Rejected`
-
-8. Keep the Sheet **private**. Share it only with the Google account you will use to sign in.
-9. Copy the Sheet ID from the URL:
-   `https://docs.google.com/spreadsheets/d/<SHEET_ID>/edit`
-
-### Publishing / testing mode
-
-While the OAuth app is in **Testing**, add your Google account as a test user on the consent screen.
-
-## GitHub secrets (for Pages build)
-
-**Settings → Secrets and variables → Actions**:
-
-| Secret | Purpose |
-| --- | --- |
-| `VITE_GOOGLE_CLIENT_ID` | OAuth Web client ID (public by design; still inject via secret to avoid hardcoding) |
-| `VITE_SHEET_ID` | Spreadsheet ID |
-
-Sign-in is restricted in code to `astridig@umich.edu` — no email secret needed.
-
-There is **no** service-account key and **no** GitHub PAT required for the site itself.
-
-> Note: Vite embeds `VITE_*` values into the client bundle. That is expected for the OAuth client ID. The Sheet ID is not a password — protection comes from keeping the Sheet private. Do not put service-account private keys or PATs in any `VITE_*` variable.
-
-## Deploy (GitHub Pages)
-
-`.github/workflows/deploy.yml` builds and deploys the empty authenticated shell on push to `main`.
-
-1. **Settings → Pages → Source:** GitHub Actions
-2. Add the two secrets above
-3. Push to `main`
-
-URL: `https://<owner>.github.io/<repo>/`
-
-## Optional: local CLI export
-
-`scripts/sync_sheet.py` can still pull a sheet with a **service account** for offline use. Prefer not to use it if the repo is public — it tempts committing `data.json`. If you do run it locally, restore the empty stub before committing:
+### 3. Local development
 
 ```bash
-cp src/data/data.example.json src/data/data.json
+cp .env.example .env.local
+# Set VITE_GOOGLE_CLIENT_ID=your-oauth-client-id.apps.googleusercontent.com
+npm install
+npm run dev
 ```
 
-Service account JSON must stay **outside** the repo.
+`.env.local` is gitignored — **never commit it**.
 
-## Optional: Apps Script dispatch
+Optional for local convenience only: `VITE_SHEET_ID` in `.env.local` to pre-select a spreadsheet. Deployed users can always paste their own Sheet after sign-in.
 
-`google-apps-script/onEdit.gs` is **not required** with live OAuth fetch (Refresh in the UI reloads the sheet). Keep it only if you want a custom automation; do not store PATs in git.
+### 4. Deploy (GitHub Pages)
+
+This repo includes `.github/workflows/deploy.yml` (builds on push to `main`).
+
+1. **Settings → Pages → Source:** GitHub Actions  
+2. **Settings → Secrets and variables → Actions** — add:
+   - `VITE_GOOGLE_CLIENT_ID` — your OAuth Web client ID  
+3. Push to `main`
+
+Site URL is typically `https://<owner>.github.io/<repo>/`.
+
+Add the same Pages origin under your OAuth client’s authorized JavaScript origins.
+
+> Vite embeds `VITE_*` values into the client bundle. That is normal for an OAuth **client ID**. Never put service-account private keys, refresh tokens, or PATs in any `VITE_*` variable or in git.
+
+---
+
+## Privacy & security checklist
+
+- No application rows or personal emails are committed to this repo (`data.json` is an empty stub if present).
+- Spreadsheet ID after connect is stored in **browser localStorage** (per Google email on that device), not on a backend.
+- OAuth tokens live in the browser session storage used by the app; sign out clears the session.
+- Do not commit `.env.local`, credentials JSON, or Apps Script secrets.
+- Prefer a private Sheet + Google sharing ACL as the real access control.
+
+---
+
+## Stack
+
+- Vite + React + TypeScript + Tailwind CSS  
+- Recharts  
+- Google Identity Services + Google Sheets API (browser OAuth)  
+- GitHub Pages  
+
+---
+
+## Optional extras
+
+- **`google-apps-script/`** — optional Sheet helpers (e.g. stamping Last Updated). Do not put tokens in git.
+- **`scripts/sync_sheet.py`** — optional offline export via a service account. Keep service-account JSON **outside** the repo; avoid using this on a public tracker.
+
+---
 
 ## Project layout
 
 ```
-.env.example                 # Template for local env (no secrets)
-.github/workflows/deploy.yml # Build + Pages (no sheet data in git)
+.env.example
+.github/workflows/deploy.yml
+google-apps-script/     # optional Sheet automations
+scripts/                # optional offline sync
 src/
-  lib/googleAuth.ts          # Google sign-in
-  lib/sheet.ts               # Sheets fetch + stats
-  components/LoginScreen.tsx
-  data/data.json             # Empty public stub
+  App.tsx
+  components/
+  lib/                  # auth, session, Sheets client
+  views/
 ```
-
-## What must never be committed
-
-- Service account JSON / private keys
-- GitHub PATs
-- `.env` / `.env.local`
-- Real application rows in `src/data/data.json`
