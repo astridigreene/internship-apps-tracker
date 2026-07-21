@@ -1,8 +1,8 @@
 name: Application ping
 
 # Empty commit only — never writes application data into the repo.
-# Creates a short-lived branch + PR, then merges into main (works with
-# “require a pull request” branch protection when reviews are not required).
+# Uses GH_PAT (classic PAT with `repo`) so push can bypass "require PR" on main.
+# Create that secret with the same token you put in Apps Script as GITHUB_TOKEN.
 on:
   repository_dispatch:
     types: [application-added, sheet-updated]
@@ -13,37 +13,33 @@ permissions:
 
 concurrency:
   group: application-ping
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   empty-commit:
     runs-on: ubuntu-latest
     steps:
+      - name: Require GH_PAT
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          if [ -z "${GH_PAT}" ]; then
+            echo "::error::Add repo secret GH_PAT (classic PAT with repo scope — same one as Apps Script GITHUB_TOKEN). GITHUB_TOKEN cannot push past branch protection on main."
+            exit 1
+          fi
+
       - name: Checkout
         uses: actions/checkout@v5
         with:
           ref: main
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GH_PAT }}
 
-      - name: Create empty commit, PR, and merge
+      - name: Empty commit on main
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BRANCH: chore/application-activity-${{ github.run_id }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          git checkout -b "$BRANCH"
           git commit --allow-empty -m "chore: application activity"
-          git push -u origin "$BRANCH"
-
-          gh pr create \
-            --base main \
-            --head "$BRANCH" \
-            --title "chore: application activity" \
-            --body "Automated empty commit from the internship tracker (no application data)."
-
-          # --admin bypasses some rules if the token can; without it, merge still works
-          # when the only requirement is “must use a pull request” (no required reviews).
-          gh pr merge --merge --delete-branch || gh pr merge --merge --admin --delete-branch
+          git push origin HEAD:main
