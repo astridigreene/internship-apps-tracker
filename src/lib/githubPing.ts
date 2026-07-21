@@ -3,11 +3,10 @@
  * Calls an Apps Script Web App that runs repository_dispatch
  * (empty commit only — no application fields).
  *
- * Prefer sendBeacon / Image over fetch: Apps Script /exec URLs redirect,
- * and browser CORS often blocks a normal fetch from GitHub Pages.
+ * Must be a GET: Apps Script /exec rejects sendBeacon's POST (HTTP 405).
+ * An Image request follows redirects without CORS issues from GitHub Pages.
  */
 export async function pingGithubApplicationAdded(): Promise<void> {
-  // Keep as runtime reads so a missing secret doesn't erase the whole helper at build time.
   const base = String(import.meta.env.VITE_GITHUB_PING_URL ?? '').trim()
   if (!base) {
     console.warn(
@@ -25,27 +24,14 @@ export async function pingGithubApplicationAdded(): Promise<void> {
   }
 
   const href = url.toString()
-  console.info('[github ping] Triggering application-added ping')
+  console.info('[github ping] Triggering application-added ping (GET)')
 
-  // 1) sendBeacon (best-effort, survives page transitions)
-  try {
-    if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
-      const ok = navigator.sendBeacon(href)
-      if (ok) {
-        return
-      }
-    }
-  } catch {
-    // fall through
-  }
-
-  // 2) Image GET — reliably follows Apps Script redirects without CORS
   await new Promise<void>((resolve) => {
     const img = new Image()
     const done = () => resolve()
     img.onload = done
-    img.onerror = done
+    img.onerror = done // JSON response isn't an image; request still completed
     img.src = href
-    window.setTimeout(done, 4000)
+    window.setTimeout(done, 5000)
   })
 }
