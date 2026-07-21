@@ -38,6 +38,19 @@ jobs:
           VITE_BASE_PATH: /${{ github.event.repository.name }}/
           # OAuth Web client ID only. Each visitor connects their own spreadsheet after sign-in.
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+          # Optional: Apps Script Web App that triggers an empty commit (no app data).
+          VITE_GITHUB_PING_URL: ${{ secrets.VITE_GITHUB_PING_URL }}
+          VITE_GITHUB_PING_SECRET: ${{ secrets.VITE_GITHUB_PING_SECRET }}
+
+      - name: Confirm ping secret is present
+        env:
+          VITE_GITHUB_PING_URL: ${{ secrets.VITE_GITHUB_PING_URL }}
+        run: |
+          if [ -z "${VITE_GITHUB_PING_URL}" ]; then
+            echo "::warning::VITE_GITHUB_PING_URL secret is empty — adding an application will NOT ping GitHub."
+          else
+            echo "VITE_GITHUB_PING_URL is set — application ping will be baked into this build."
+          fi
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

@@ -109,6 +109,20 @@ Add the same Pages origin under your OAuth client’s authorized JavaScript orig
 
 ---
 
+## Optional: empty GitHub commit when you add an application
+
+Application rows stay in Google Sheets only. If you still want the repo to get a **push** when you hit New (with **no** company/role/status in git):
+
+1. In your spreadsheet: **Extensions → Apps Script**, paste `google-apps-script/onEdit.gs` (set `OWNER` / `REPO`).
+2. Script Properties: `GITHUB_TOKEN` (needs `repo` scope or permission to create `repository_dispatch`).
+3. Deploy as a **Web app** (execute as you; access “Anyone”).
+4. Set `VITE_GITHUB_PING_URL` to that Web App URL (local `.env.local` and/or GitHub Actions secret). Optional: matching `PING_SECRET` / `VITE_GITHUB_PING_SECRET`.
+5. Workflow `.github/workflows/application-ping.yml` creates an empty commit (`chore: application activity`).
+
+Without `VITE_GITHUB_PING_URL`, adding an application only updates the Sheet.
+
+---
+
 ## Privacy & security checklist
 
 - No application rows or personal emails are committed to this repo (`data.json` is an empty stub if present).

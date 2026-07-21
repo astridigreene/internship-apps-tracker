@@ -4,6 +4,10 @@ interface ImportMetaEnv {
   readonly VITE_GOOGLE_CLIENT_ID: string
   readonly VITE_SHEET_ID?: string
   readonly VITE_BASE_PATH: string
+  /** Apps Script Web App URL that dispatches an empty-commit GitHub Action. */
+  readonly VITE_GITHUB_PING_URL?: string
+  /** Optional shared secret for the ping Web App (PING_SECRET). */
+  readonly VITE_GITHUB_PING_SECRET?: string
 }
 
 interface ImportMeta {

@@ -30,6 +30,7 @@ import {
 } from './lib/sheet'
 import { statusUpdateStamp } from './lib/time'
 import { celebrate } from './lib/celebrate'
+import { pingGithubApplicationAdded } from './lib/githubPing'
 import {
   clearSession,
   clearSheetIdForEmail,
@@ -613,6 +614,10 @@ export default function App() {
       if (!isRejectedStatus(application.status)) {
         celebrate()
       }
+      // Empty GitHub commit only (no application fields). Optional; ignores failures.
+      void pingGithubApplicationAdded().catch(() => {
+        // ping is best-effort — Sheet write already succeeded
+      })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Could not add application'
       setError(message)
