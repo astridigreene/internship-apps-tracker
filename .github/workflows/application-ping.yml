@@ -1,0 +1,30 @@
+name: Application ping
+
+# Empty commit only — never writes application data into the repo.
+# Triggered by Apps Script (Web App URL or optional Sheet onEdit).
+on:
+  repository_dispatch:
+    types: [application-added, sheet-updated]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: application-ping
+  cancel-in-progress: false
+
+jobs:
+  empty-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Empty commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit --allow-empty -m "chore: application activity"
+          git push
