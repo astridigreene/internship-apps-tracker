@@ -36,20 +36,21 @@ jobs:
         run: npm run build
         env:
           VITE_BASE_PATH: /${{ github.event.repository.name }}/
-          # OAuth Web client ID only. Each visitor connects their own spreadsheet after sign-in.
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
-          # Optional: Apps Script Web App that triggers an empty commit (no app data).
-          VITE_GITHUB_PING_URL: ${{ secrets.VITE_GITHUB_PING_URL }}
-          VITE_GITHUB_PING_SECRET: ${{ secrets.VITE_GITHUB_PING_SECRET }}
+          # Same classic PAT as Actions secret GH_PAT (repo scope). Baked into the
+          # static site only to fire repository_dispatch — never sends sheet rows.
+          VITE_GH_PAT: ${{ secrets.GH_PAT }}
+          VITE_GITHUB_REPO: ${{ github.repository }}
 
-      - name: Confirm ping secret is present
+      - name: Confirm GH_PAT is present for application ping
         env:
-          VITE_GITHUB_PING_URL: ${{ secrets.VITE_GITHUB_PING_URL }}
+          GH_PAT: ${{ secrets.GH_PAT }}
         run: |
-          if [ -z "${VITE_GITHUB_PING_URL}" ]; then
-            echo "::warning::VITE_GITHUB_PING_URL secret is empty — adding an application will NOT ping GitHub."
+          if [ -z "${GH_PAT}" ]; then
+            echo "::error::Secret GH_PAT is missing. Add a classic PAT with repo scope as Actions secret GH_PAT, then redeploy. Application adds will not trigger empty commits without it."
+            exit 1
           else
-            echo "VITE_GITHUB_PING_URL is set — application ping will be baked into this build."
+            echo "GH_PAT is set — application ping dispatch will be baked into this build."
           fi
 
       - name: Setup Pages
