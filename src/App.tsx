@@ -761,7 +761,17 @@ export default function App() {
           void handleHome()
         }}
         refreshing={refreshing}
-        nav={<Nav active={view} onNavigate={setView} />}
+        nav={
+          <Nav
+            active={view}
+            onNavigate={(next) => {
+              setView(next)
+              if (next === 'applications') {
+                setApplicationsFilter('Active')
+              }
+            }}
+          />
+        }
         yearTabs={yearTabs}
       />
       {error ? (
@@ -810,6 +820,9 @@ export default function App() {
         active={view}
         onNavigate={(next) => {
           setView(next)
+          if (next === 'applications') {
+            setApplicationsFilter('Active')
+          }
           window.scrollTo({ top: 0, behavior: 'smooth' })
         }}
       />
