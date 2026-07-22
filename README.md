@@ -99,27 +99,13 @@ This repo includes `.github/workflows/deploy.yml` (builds on push to `main`).
 1. **Settings → Pages → Source:** GitHub Actions  
 2. **Settings → Secrets and variables → Actions** — add:
    - `VITE_GOOGLE_CLIENT_ID` — your OAuth Web client ID  
-   - `GH_PAT` — classic PAT with `repo` (needed for empty-commit pings on app add / status advance)
 3. Push to `main`
 
 Site URL is typically `https://<owner>.github.io/<repo>/`.
 
 Add the same Pages origin under your OAuth client’s authorized JavaScript origins.
 
-> Vite embeds `VITE_*` values into the client bundle. That is normal for an OAuth **client ID**. `GH_PAT` is also baked in as `VITE_GH_PAT` only to fire `repository_dispatch` — it never sends sheet rows. Prefer a fine-scoped PAT you can rotate.
-
----
-
-## Optional: empty GitHub commit when you add an application
-
-Application rows stay in Google Sheets only. When you add an app or advance status, the site can fire `repository_dispatch` so `.github/workflows/application-ping.yml` creates an **empty** commit (`chore: application activity`) with **your** git author (so it counts on your contribution graph).
-
-1. Create a classic PAT with `repo` scope; add it as Actions secret `GH_PAT`.
-2. Confirm that PAT’s account email matches the author in `application-ping.yml` (and is verified on GitHub).
-3. Redeploy so `VITE_GH_PAT` / `VITE_GITHUB_REPO` are in the Pages build.
-4. Optional local test: set those in `.env.local` (see `.env.example`).
-
-Without `GH_PAT`, adding an application only updates the Sheet.
+> Vite embeds `VITE_*` values into the client bundle. That is normal for an OAuth **client ID**. Never put service-account private keys, refresh tokens, or PATs in any `VITE_*` variable or in git.
 
 ---
 
@@ -161,7 +147,6 @@ Optional Script properties: `REMINDER_EMAIL`, `REMINDER_YEAR` (e.g. `2027`).
 ## Optional extras
 
 - **`google-apps-script/`** — optional Sheet helpers (daily reminder email, Last Updated stamp). Do not put tokens in git.
-- **`.github/workflows/application-ping.yml`** — empty commit on application activity (contribution graph).
 - **`scripts/sync_sheet.py`** — optional offline export via a service account. Keep service-account JSON **outside** the repo; avoid using this on a public tracker.
 
 ---
@@ -171,12 +156,11 @@ Optional Script properties: `REMINDER_EMAIL`, `REMINDER_YEAR` (e.g. `2027`).
 ```
 .env.example
 .github/workflows/deploy.yml
-.github/workflows/application-ping.yml
 google-apps-script/     # optional Sheet automations
 scripts/                # optional offline sync
 src/
   App.tsx
   components/
-  lib/                  # auth, session, Sheets client, githubPing
+  lib/                  # auth, session, Sheets client
   views/
 ```
