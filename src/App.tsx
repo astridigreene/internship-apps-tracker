@@ -61,6 +61,8 @@ export default function App() {
   const [view, setView] = useState<ViewId>('dashboard')
   const [applicationsFilter, setApplicationsFilter] =
     useState<ApplicationsStatusFilter>('Active')
+  /** Bumped when opening Apps via nav/tab so search + local UI state reset. */
+  const [applicationsViewKey, setApplicationsViewKey] = useState(0)
   const [accessToken, setAccessToken] = useState<string | null>(null)
   const [user, setUser] = useState<GoogleUser | null>(null)
   const [sheetId, setSheetId] = useState<string | null>(null)
@@ -447,6 +449,16 @@ export default function App() {
     }
   }
 
+  /** Dashboard / Applications from top nav or mobile tab bar — not KPI deep-links. */
+  function handleNavNavigate(next: ViewId) {
+    setView(next)
+    if (next === 'applications') {
+      setApplicationsFilter('Active')
+      setApplicationsViewKey((key) => key + 1)
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   function handleChangeSheet() {
     setData(null)
     setYears([])
@@ -761,17 +773,7 @@ export default function App() {
           void handleHome()
         }}
         refreshing={refreshing}
-        nav={
-          <Nav
-            active={view}
-            onNavigate={(next) => {
-              setView(next)
-              if (next === 'applications') {
-                setApplicationsFilter('Active')
-              }
-            }}
-          />
-        }
+        nav={<Nav active={view} onNavigate={handleNavNavigate} />}
         yearTabs={yearTabs}
       />
       {error ? (
@@ -802,6 +804,7 @@ export default function App() {
         ) : (
           <div className="flex flex-1 flex-col lg:min-h-0">
             <ApplicationsView
+              key={applicationsViewKey}
               applications={data.applications}
               statusFilter={applicationsFilter}
               onStatusFilterChange={setApplicationsFilter}
@@ -816,16 +819,7 @@ export default function App() {
           </div>
         )}
       </main>
-      <MobileTabBar
-        active={view}
-        onNavigate={(next) => {
-          setView(next)
-          if (next === 'applications') {
-            setApplicationsFilter('Active')
-          }
-          window.scrollTo({ top: 0, behavior: 'smooth' })
-        }}
-      />
+      <MobileTabBar active={view} onNavigate={handleNavNavigate} />
     </div>
   )
 }
