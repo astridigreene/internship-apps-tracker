@@ -109,17 +109,19 @@ Add the same Pages origin under your OAuth client’s authorized JavaScript orig
 
 ---
 
-## Optional: empty GitHub commit when you add an application
+## Optional: daily reminder email (8:30pm)
 
-Application rows stay in Google Sheets only. If you still want the repo to get a **push** when you hit New (with **no** company/role/status in git):
+Example file: `google-apps-script/dailyReminder.example.gs`  
+(Your personal copy `dailyReminder.gs` is gitignored.)
 
-1. In your spreadsheet: **Extensions → Apps Script**, paste `google-apps-script/onEdit.gs` (set `OWNER` / `REPO`).
-2. Script Properties: `GITHUB_TOKEN` (needs `repo` scope or permission to create `repository_dispatch`).
-3. Deploy as a **Web app** (execute as you; access “Anyone”).
-4. Set `VITE_GITHUB_PING_URL` to that Web App URL (local `.env.local` and/or GitHub Actions secret). Optional: matching `PING_SECRET` / `VITE_GITHUB_PING_SECRET`.
-5. Workflow `.github/workflows/application-ping.yml` creates an empty commit (`chore: application activity`).
+Emails a nudge to apply plus incomplete OAs (`Status = OA` and `OA Complete = N`).
 
-Without `VITE_GITHUB_PING_URL`, adding an application only updates the Sheet.
+1. Spreadsheet → **Extensions → Apps Script** → paste the example (set your email / dashboard URL).
+2. **Project settings → Time zone** → Eastern (or your zone) — 8:30pm uses this.
+3. Run **`createDailyReminderTrigger`** once (authorize Gmail/Sheets when asked).
+4. Optional test: run **`sendDailyReminderEmail`**.
+
+Optional Script properties: `REMINDER_EMAIL`, `REMINDER_YEAR` (e.g. `2027`).
 
 ---
 
@@ -144,7 +146,7 @@ Without `VITE_GITHUB_PING_URL`, adding an application only updates the Sheet.
 
 ## Optional extras
 
-- **`google-apps-script/`** — optional Sheet helpers (e.g. stamping Last Updated). Do not put tokens in git.
+- **`google-apps-script/`** — optional Sheet helpers (daily reminder email, Last Updated stamp). Do not put tokens in git.
 - **`scripts/sync_sheet.py`** — optional offline export via a service account. Keep service-account JSON **outside** the repo; avoid using this on a public tracker.
 
 ---

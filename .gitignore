@@ -27,6 +27,9 @@ __pycache__/
 # Local-only copy of synced sheet data (optional)
 src/data/data.local.json
 
+# Personal Apps Script (contains reminder email / local tweaks)
+google-apps-script/dailyReminder.gs
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
