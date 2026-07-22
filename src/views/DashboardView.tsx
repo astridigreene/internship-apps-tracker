@@ -62,7 +62,7 @@ export function DashboardView({
         onUpdateOaComplete={onUpdateOaComplete}
       />
 
-      <div className="grid shrink-0 grid-cols-5 gap-2">
+      <div className="grid shrink-0 grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
         <KpiCard
           compact
           tone="applied"
@@ -101,25 +101,26 @@ export function DashboardView({
           value={stats.rejections}
           rate={formatRate(stats.rejectionRate)}
           onClick={() => onOpenApplications('Rejected')}
+          className="col-span-2 sm:col-span-1"
         />
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-2 max-lg:auto-rows-[180px] lg:grid-cols-12">
-        <div className="min-h-0 lg:col-span-4">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-2 max-lg:auto-rows-[min(220px,40vh)] lg:grid-cols-12">
+        <div className="min-h-0 max-lg:min-h-[200px] lg:col-span-4">
           <OaCard
             applications={data.applications}
             onOpenAll={() => onOpenApplications('OA')}
             onSelectApplication={setDetailApp}
           />
         </div>
-        <div className="min-h-0 lg:col-span-5">
+        <div className="min-h-0 max-lg:min-h-[220px] lg:col-span-5">
           <StatusFunnel
             applications={data.applications}
             fill
             onSelectStage={onOpenApplications}
           />
         </div>
-        <div className="min-h-0 lg:col-span-3">
+        <div className="min-h-0 max-lg:min-h-[200px] lg:col-span-3">
           <RecentUpdates
             applications={data.applications}
             onSelectApplication={setDetailApp}

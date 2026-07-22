@@ -46,7 +46,7 @@ export function DeleteConfirmModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-4"
       role="presentation"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && !submitting) {
@@ -58,7 +58,7 @@ export function DeleteConfirmModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="w-full max-w-sm rounded-lg border border-panel-border bg-app-surface shadow-[0_16px_40px_rgba(0,0,0,0.18)]"
+        className="w-full max-w-sm rounded-t-xl border border-panel-border bg-app-surface shadow-[0_16px_40px_rgba(0,0,0,0.18)] sm:rounded-lg"
       >
         <div className="border-b border-app-border px-4 py-3">
           <h2 id={titleId} className="text-[15px] font-bold text-app-text">

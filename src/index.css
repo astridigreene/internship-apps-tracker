@@ -185,7 +185,17 @@ a:hover,
 select:not(:disabled):hover,
 summary:hover,
 [role='button']:hover {
-  transform: scale(1.04);
+  transform: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  button:not(:disabled):hover,
+  a:hover,
+  select:not(:disabled):hover,
+  summary:hover,
+  [role='button']:hover {
+    transform: scale(1.04);
+  }
 }
 
 button:not(:disabled):active,

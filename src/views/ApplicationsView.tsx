@@ -324,20 +324,20 @@ export function ApplicationsView({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search…"
-          className="h-9 min-w-[200px] flex-1 rounded border border-app-border bg-app-surface px-3 text-[13px] font-semibold text-app-text outline-none placeholder:font-medium placeholder:text-app-text-weak focus:border-app-brand"
+          className="h-9 min-w-0 flex-1 basis-[140px] rounded border border-app-border bg-app-surface px-3 text-[13px] font-semibold text-app-text outline-none placeholder:font-medium placeholder:text-app-text-weak focus:border-app-brand sm:min-w-[200px]"
         />
         <p className="text-[12px] font-bold text-app-text-weak tabular-nums">
           {filtered.length}/{applications.length}
         </p>
 
-        <div className="ml-auto flex items-center gap-1.5">
+        <div className="flex w-full items-center gap-1.5 sm:ml-auto sm:w-auto">
           <button
             type="button"
             onClick={() => setNewOpen(true)}
             disabled={!onAddApplication || busy}
             title="Add new application"
             aria-label="Add new application"
-            className="inline-flex h-9 items-center gap-1.5 rounded bg-app-brand px-2.5 text-[12px] font-bold text-white hover:bg-app-brand-dark disabled:cursor-not-allowed disabled:opacity-40 dark:text-teal-950"
+            className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded bg-app-brand px-2.5 text-[12px] font-bold text-white hover:bg-app-brand-dark disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none dark:text-teal-950"
           >
             <PlusIcon />
             New
@@ -350,7 +350,7 @@ export function ApplicationsView({
                 disabled={saving}
                 title="Cancel editing"
                 aria-label="Cancel editing"
-                className="inline-flex h-9 items-center gap-1.5 rounded border border-app-border bg-app-surface px-2.5 text-[12px] font-bold text-app-text hover:bg-app-hover disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded border border-app-border bg-app-surface px-2.5 text-[12px] font-bold text-app-text hover:bg-app-hover disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none"
               >
                 Cancel
               </button>
@@ -370,7 +370,7 @@ export function ApplicationsView({
                     ? 'No edits to save'
                     : 'Save status changes'
                 }
-                className="inline-flex h-9 items-center gap-1.5 rounded bg-app-brand px-2.5 text-[12px] font-bold text-white hover:bg-app-brand-dark disabled:cursor-not-allowed disabled:bg-app-brand/35 disabled:opacity-100 disabled:hover:bg-app-brand/35 dark:text-teal-950 dark:disabled:text-teal-950/50"
+                className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded bg-app-brand px-2.5 text-[12px] font-bold text-white hover:bg-app-brand-dark disabled:cursor-not-allowed disabled:bg-app-brand/35 disabled:opacity-100 disabled:hover:bg-app-brand/35 sm:flex-none dark:text-teal-950 dark:disabled:text-teal-950/50"
               >
                 <CheckIcon />
                 {saving ? 'Saving…' : 'Save'}
@@ -383,7 +383,7 @@ export function ApplicationsView({
               disabled={!onSaveStatusChanges || busy}
               title="Edit statuses"
               aria-label="Edit statuses"
-              className="inline-flex h-9 items-center gap-1.5 rounded border border-app-border bg-app-surface px-2.5 text-[12px] font-bold text-app-text hover:bg-app-hover disabled:cursor-not-allowed disabled:opacity-40"
+              className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded border border-app-border bg-app-surface px-2.5 text-[12px] font-bold text-app-text hover:bg-app-hover disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none"
             >
               <PencilIcon />
               Edit
@@ -392,14 +392,14 @@ export function ApplicationsView({
         </div>
       </div>
 
-      <div className="flex w-full shrink-0 flex-wrap items-center gap-1.5">
-        <span className="mr-0.5 text-[11px] font-bold tracking-[0.06em] uppercase text-app-text-weak">
+      <div className="flex w-full shrink-0 flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:items-center">
+        <span className="text-[11px] font-bold tracking-[0.06em] uppercase text-app-text-weak sm:mr-0.5">
           Filters
         </span>
         <div
           role="group"
           aria-label="Status filters"
-          className="flex flex-wrap items-center gap-1.5"
+          className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5 sm:flex-wrap sm:overflow-visible"
         >
           {STATUS_OPTIONS.map((opt) => {
             const active = statusFilter === opt
@@ -410,7 +410,7 @@ export function ApplicationsView({
                 aria-pressed={active}
                 onClick={() => onStatusFilterChange(opt)}
                 className={[
-                  'inline-flex h-8 items-center rounded border px-2.5 text-[12px] font-bold transition-colors',
+                  'inline-flex h-8 shrink-0 items-center rounded border px-2.5 text-[12px] font-bold transition-colors',
                   active
                     ? 'border-app-brand bg-app-brand text-white dark:text-teal-950'
                     : 'border-app-border bg-app-surface text-app-text hover:border-app-brand/50 hover:bg-app-hover',
@@ -481,7 +481,81 @@ export function ApplicationsView({
       />
 
       <div className="min-h-0 w-full flex-1 overflow-auto rounded-md border border-panel-border bg-app-surface">
-        <table className="w-full table-fixed border-collapse text-left text-[13px]">
+        {/* Mobile card list */}
+        <ul className="divide-y divide-app-border md:hidden">
+          {filtered.length === 0 ? (
+            <li className="px-3 py-6 text-center text-[13px] font-semibold text-app-text-weak">
+              No applications match the current filters.
+            </li>
+          ) : (
+            filtered.map((app, i) => {
+              const status = statusOf(app)
+              return (
+                <li key={`${app.sheetRow}-${app.company}-${app.dateApplied}-${i}`}>
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    className="flex cursor-pointer items-start gap-2 px-3 py-3 hover:bg-app-hover"
+                    onClick={() => setDetailApp(app)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        setDetailApp(app)
+                      }
+                    }}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="truncate text-[14px] font-bold text-app-text">
+                          {app.company || 'Untitled'}
+                        </p>
+                        {editing ? (
+                          <div
+                            className="shrink-0"
+                            onClick={(event) => event.stopPropagation()}
+                            onKeyDown={(event) => event.stopPropagation()}
+                          >
+                            <StatusSelect
+                              value={status}
+                              disabled={saving || deleting || !onSaveStatusChanges}
+                              onChange={(next) => handleDraftStatusChange(app, next)}
+                            />
+                          </div>
+                        ) : (
+                          <StatusPill status={status} />
+                        )}
+                      </div>
+                      <p className="mt-0.5 truncate text-[12px] font-semibold text-app-text">
+                        {app.role}
+                      </p>
+                      <p className="mt-1 text-[11px] font-semibold text-app-text-weak">
+                        {[app.location, formatDisplayDate(app.dateApplied) || app.dateApplied]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      title={`Delete ${app.company || 'application'}`}
+                      aria-label={`Delete ${app.company || 'application'}`}
+                      disabled={!onDeleteApplication || busy}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        setPendingDelete(app)
+                      }}
+                      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded text-rose-600 hover:bg-rose-500/10 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-40 dark:text-rose-400 dark:hover:text-rose-300"
+                    >
+                      <TrashIcon />
+                    </button>
+                  </div>
+                </li>
+              )
+            })
+          )}
+        </ul>
+
+        {/* Desktop table */}
+        <table className="hidden w-full table-fixed border-collapse text-left text-[13px] md:table">
           <colgroup>
             {COLUMNS.map((col) => (
               <col key={col.key} style={{ width: col.width }} />

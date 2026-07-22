@@ -8,6 +8,7 @@ interface KpiCardProps {
   compact?: boolean
   tone?: KpiTone
   onClick?: () => void
+  className?: string
 }
 
 const TONE_CLASS: Record<KpiTone, string> = {
@@ -27,6 +28,7 @@ export function KpiCard({
   compact,
   tone = 'neutral',
   onClick,
+  className: classNameProp,
 }: KpiCardProps) {
   const className = [
     'rounded-md border text-left',
@@ -35,6 +37,7 @@ export function KpiCard({
     onClick
       ? 'w-full transition hover:brightness-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-brand'
       : '',
+    classNameProp ?? '',
   ].join(' ')
 
   const content = (

@@ -768,7 +768,7 @@ export default function App() {
           {error}
         </div>
       ) : null}
-      <main className="flex min-h-0 flex-1 flex-col overflow-hidden p-3">
+      <main className="flex min-h-0 flex-1 flex-col overflow-hidden p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:p-3">
         {switchingYear ? (
           <p className="mb-1.5 shrink-0 text-[11px] text-app-text-weak">
             Loading {selectedYear}…
