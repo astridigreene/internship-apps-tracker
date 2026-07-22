@@ -1,13 +1,12 @@
 /**
- * After adding an application, ask GitHub to run the empty-commit workflow.
- * No application fields are sent — only event_type "application-added".
+ * Ask GitHub to run the empty-commit workflow (no application fields sent).
+ * Used after adding an app or advancing status (e.g. Applied → OA).
  *
- * Uses repository_dispatch directly (Apps Script redirects are unreliable
- * from GitHub Pages). Requires build-time secrets:
+ * Requires build-time secrets:
  *   VITE_GH_PAT        — classic PAT with `repo` (same as Actions GH_PAT)
  *   VITE_GITHUB_REPO   — "owner/repo" (set automatically in deploy.yml)
  */
-export async function pingGithubApplicationAdded(): Promise<void> {
+export async function pingGithubActivity(): Promise<void> {
   const token = String(import.meta.env.VITE_GH_PAT ?? '').trim()
   const repo = String(import.meta.env.VITE_GITHUB_REPO ?? '').trim()
 
@@ -48,3 +47,6 @@ export async function pingGithubApplicationAdded(): Promise<void> {
 
   console.info('[github ping] OK — Application ping workflow should start')
 }
+
+/** @deprecated Use pingGithubActivity */
+export const pingGithubApplicationAdded = pingGithubActivity
