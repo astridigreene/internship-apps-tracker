@@ -37,6 +37,21 @@ jobs:
         env:
           VITE_BASE_PATH: /${{ github.event.repository.name }}/
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+          # Same classic PAT as Actions secret GH_PAT (repo scope). Baked into the
+          # static site only to fire repository_dispatch — never sends sheet rows.
+          VITE_GH_PAT: ${{ secrets.GH_PAT }}
+          VITE_GITHUB_REPO: ${{ github.repository }}
+
+      - name: Confirm GH_PAT is present for application ping
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          if [ -z "${GH_PAT}" ]; then
+            echo "::error::Secret GH_PAT is missing. Add a classic PAT with repo scope as Actions secret GH_PAT, then redeploy. Application adds will not trigger empty commits without it."
+            exit 1
+          else
+            echo "GH_PAT is set — application ping dispatch will be baked into this build."
+          fi
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

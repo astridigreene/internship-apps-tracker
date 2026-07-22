@@ -1,0 +1,46 @@
+name: Application ping
+
+# Empty commit only — never writes application data into the repo.
+# Uses GH_PAT (classic PAT with `repo`) so push can bypass "require PR" on main.
+# Create that secret with the same token you put in Apps Script as GITHUB_TOKEN.
+on:
+  repository_dispatch:
+    types: [application-added, sheet-updated]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: application-ping
+  cancel-in-progress: true
+
+jobs:
+  empty-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require GH_PAT
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          if [ -z "${GH_PAT}" ]; then
+            echo "::error::Add repo secret GH_PAT (classic PAT with repo scope — same one as Apps Script GITHUB_TOKEN). GITHUB_TOKEN cannot push past branch protection on main."
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: main
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Empty commit on main
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          set -euo pipefail
+          # Author email must be on your GitHub account for contribution graph credit.
+          git config user.name "Astrid Greene"
+          git config user.email "astridionegreene@gmail.com"
+          git commit --allow-empty -m "chore: application activity"
+          git push origin HEAD:main

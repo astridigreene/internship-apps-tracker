@@ -4,6 +4,13 @@ interface ImportMetaEnv {
   readonly VITE_GOOGLE_CLIENT_ID: string
   readonly VITE_SHEET_ID?: string
   readonly VITE_BASE_PATH: string
+  /** Classic PAT with `repo` — used only to fire repository_dispatch (no app data). */
+  readonly VITE_GH_PAT?: string
+  /** "owner/repo" for repository_dispatch */
+  readonly VITE_GITHUB_REPO?: string
+  /** @deprecated Prefer VITE_GH_PAT direct dispatch */
+  readonly VITE_GITHUB_PING_URL?: string
+  readonly VITE_GITHUB_PING_SECRET?: string
 }
 
 interface ImportMeta {
