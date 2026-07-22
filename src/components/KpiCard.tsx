@@ -31,9 +31,9 @@ export function KpiCard({
   className: classNameProp,
 }: KpiCardProps) {
   const className = [
-    'rounded-md border text-left',
+    'rounded-xl border text-left lg:rounded-md',
     TONE_CLASS[tone],
-    compact ? 'px-2.5 py-1.5' : 'px-3.5 py-3',
+    compact ? 'px-3 py-2.5 lg:px-2.5 lg:py-1.5' : 'px-3.5 py-3',
     onClick
       ? 'w-full transition hover:brightness-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-brand'
       : '',
@@ -42,14 +42,14 @@ export function KpiCard({
 
   const content = (
     <>
-      <p className="text-[10px] font-semibold tracking-[0.08em] uppercase opacity-80">
+      <p className="text-[11px] font-semibold tracking-[0.08em] uppercase opacity-80 lg:text-[10px]">
         {label}
       </p>
-      <div className="mt-0.5 flex items-baseline gap-1.5">
+      <div className="mt-1 flex items-baseline gap-1.5 lg:mt-0.5">
         <p
           className={[
             'leading-none font-bold tracking-tight tabular-nums',
-            compact ? 'text-[18px]' : 'text-[22px]',
+            compact ? 'text-[22px] lg:text-[18px]' : 'text-[22px]',
           ].join(' ')}
         >
           {value}
@@ -58,7 +58,7 @@ export function KpiCard({
           ) : null}
         </p>
         {rate ? (
-          <p className="text-[11px] font-semibold tabular-nums opacity-70">{rate}</p>
+          <p className="text-[12px] font-semibold tabular-nums opacity-70 lg:text-[11px]">{rate}</p>
         ) : null}
       </div>
     </>

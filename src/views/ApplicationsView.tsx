@@ -317,27 +317,29 @@ export function ApplicationsView({
       : (applications.find((a) => a.sheetRow === detailApp.sheetRow) ?? detailApp)
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col gap-2.5">
-      <div className="flex w-full shrink-0 flex-wrap items-center gap-2">
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search…"
-          className="h-9 min-w-0 flex-1 basis-[140px] rounded border border-app-border bg-app-surface px-3 text-[13px] font-semibold text-app-text outline-none placeholder:font-medium placeholder:text-app-text-weak focus:border-app-brand sm:min-w-[200px]"
-        />
-        <p className="text-[12px] font-bold text-app-text-weak tabular-nums">
-          {filtered.length}/{applications.length}
-        </p>
+    <div className="flex w-full flex-col gap-3 lg:h-full lg:min-h-0 lg:gap-2.5">
+      <div className="flex w-full shrink-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search…"
+            className="h-11 min-w-0 flex-1 rounded-lg border border-app-border bg-app-surface px-3 text-[15px] font-semibold text-app-text outline-none placeholder:font-medium placeholder:text-app-text-weak focus:border-app-brand lg:h-9 lg:rounded lg:text-[13px]"
+          />
+          <p className="shrink-0 text-[12px] font-bold text-app-text-weak tabular-nums">
+            {filtered.length}/{applications.length}
+          </p>
+        </div>
 
-        <div className="flex w-full items-center gap-1.5 sm:ml-auto sm:w-auto">
+        <div className="flex w-full items-center gap-2 sm:ml-auto sm:w-auto">
           <button
             type="button"
             onClick={() => setNewOpen(true)}
             disabled={!onAddApplication || busy}
             title="Add new application"
             aria-label="Add new application"
-            className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded bg-app-brand px-2.5 text-[12px] font-bold text-white hover:bg-app-brand-dark disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none dark:text-teal-950"
+            className="inline-flex h-11 flex-1 items-center justify-center gap-1.5 rounded-lg bg-app-brand px-3 text-[13px] font-bold text-white hover:bg-app-brand-dark disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none lg:h-9 lg:rounded lg:px-2.5 lg:text-[12px] dark:text-teal-950"
           >
             <PlusIcon />
             New
@@ -350,7 +352,7 @@ export function ApplicationsView({
                 disabled={saving}
                 title="Cancel editing"
                 aria-label="Cancel editing"
-                className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded border border-app-border bg-app-surface px-2.5 text-[12px] font-bold text-app-text hover:bg-app-hover disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none"
+                className="inline-flex h-11 flex-1 items-center justify-center gap-1.5 rounded-lg border border-app-border bg-app-surface px-3 text-[13px] font-bold text-app-text hover:bg-app-hover disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none lg:h-9 lg:rounded lg:px-2.5 lg:text-[12px]"
               >
                 Cancel
               </button>
@@ -370,7 +372,7 @@ export function ApplicationsView({
                     ? 'No edits to save'
                     : 'Save status changes'
                 }
-                className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded bg-app-brand px-2.5 text-[12px] font-bold text-white hover:bg-app-brand-dark disabled:cursor-not-allowed disabled:bg-app-brand/35 disabled:opacity-100 disabled:hover:bg-app-brand/35 sm:flex-none dark:text-teal-950 dark:disabled:text-teal-950/50"
+                className="inline-flex h-11 flex-1 items-center justify-center gap-1.5 rounded-lg bg-app-brand px-3 text-[13px] font-bold text-white hover:bg-app-brand-dark disabled:cursor-not-allowed disabled:bg-app-brand/35 disabled:opacity-100 disabled:hover:bg-app-brand/35 sm:flex-none lg:h-9 lg:rounded lg:px-2.5 lg:text-[12px] dark:text-teal-950 dark:disabled:text-teal-950/50"
               >
                 <CheckIcon />
                 {saving ? 'Saving…' : 'Save'}
@@ -383,7 +385,7 @@ export function ApplicationsView({
               disabled={!onSaveStatusChanges || busy}
               title="Edit statuses"
               aria-label="Edit statuses"
-              className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded border border-app-border bg-app-surface px-2.5 text-[12px] font-bold text-app-text hover:bg-app-hover disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none"
+              className="inline-flex h-11 flex-1 items-center justify-center gap-1.5 rounded-lg border border-app-border bg-app-surface px-3 text-[13px] font-bold text-app-text hover:bg-app-hover disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none lg:h-9 lg:rounded lg:px-2.5 lg:text-[12px]"
             >
               <PencilIcon />
               Edit
@@ -392,14 +394,14 @@ export function ApplicationsView({
         </div>
       </div>
 
-      <div className="flex w-full shrink-0 flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:items-center">
-        <span className="text-[11px] font-bold tracking-[0.06em] uppercase text-app-text-weak sm:mr-0.5">
+      <div className="flex w-full shrink-0 flex-col gap-1.5">
+        <span className="text-[11px] font-bold tracking-[0.06em] uppercase text-app-text-weak">
           Filters
         </span>
         <div
           role="group"
           aria-label="Status filters"
-          className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5 sm:flex-wrap sm:overflow-visible"
+          className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 [scrollbar-width:none] lg:mx-0 lg:flex-wrap lg:overflow-visible lg:px-0 lg:pb-0 [&::-webkit-scrollbar]:hidden"
         >
           {STATUS_OPTIONS.map((opt) => {
             const active = statusFilter === opt
@@ -410,7 +412,7 @@ export function ApplicationsView({
                 aria-pressed={active}
                 onClick={() => onStatusFilterChange(opt)}
                 className={[
-                  'inline-flex h-8 shrink-0 items-center rounded border px-2.5 text-[12px] font-bold transition-colors',
+                  'inline-flex h-10 shrink-0 items-center rounded-full border px-3.5 text-[13px] font-bold transition-colors lg:h-8 lg:rounded lg:px-2.5 lg:text-[12px]',
                   active
                     ? 'border-app-brand bg-app-brand text-white dark:text-teal-950'
                     : 'border-app-border bg-app-surface text-app-text hover:border-app-brand/50 hover:bg-app-hover',
@@ -480,11 +482,11 @@ export function ApplicationsView({
         onUpdateOaComplete={onUpdateOaComplete}
       />
 
-      <div className="min-h-0 w-full flex-1 overflow-auto rounded-md border border-panel-border bg-app-surface">
+      <div className="w-full overflow-hidden rounded-xl border border-panel-border bg-app-surface lg:min-h-0 lg:flex-1 lg:overflow-auto lg:rounded-md">
         {/* Mobile card list */}
         <ul className="divide-y divide-app-border md:hidden">
           {filtered.length === 0 ? (
-            <li className="px-3 py-6 text-center text-[13px] font-semibold text-app-text-weak">
+            <li className="px-4 py-8 text-center text-[14px] font-semibold text-app-text-weak">
               No applications match the current filters.
             </li>
           ) : (
@@ -495,7 +497,7 @@ export function ApplicationsView({
                   <div
                     role="button"
                     tabIndex={0}
-                    className="flex cursor-pointer items-start gap-2 px-3 py-3 hover:bg-app-hover"
+                    className="flex cursor-pointer items-start gap-3 px-4 py-3.5 hover:bg-app-hover"
                     onClick={() => setDetailApp(app)}
                     onKeyDown={(event) => {
                       if (event.key === 'Enter' || event.key === ' ') {
@@ -506,7 +508,7 @@ export function ApplicationsView({
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
-                        <p className="truncate text-[14px] font-bold text-app-text">
+                        <p className="min-w-0 text-[15px] leading-snug font-bold text-app-text">
                           {app.company || 'Untitled'}
                         </p>
                         {editing ? (
@@ -525,10 +527,8 @@ export function ApplicationsView({
                           <StatusPill status={status} />
                         )}
                       </div>
-                      <p className="mt-0.5 truncate text-[12px] font-semibold text-app-text">
-                        {app.role}
-                      </p>
-                      <p className="mt-1 text-[11px] font-semibold text-app-text-weak">
+                      <p className="mt-1 text-[13px] font-semibold text-app-text">{app.role}</p>
+                      <p className="mt-1 text-[12px] font-semibold text-app-text-weak">
                         {[app.location, formatDisplayDate(app.dateApplied) || app.dateApplied]
                           .filter(Boolean)
                           .join(' · ')}
@@ -543,7 +543,7 @@ export function ApplicationsView({
                         event.stopPropagation()
                         setPendingDelete(app)
                       }}
-                      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded text-rose-600 hover:bg-rose-500/10 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-40 dark:text-rose-400 dark:hover:text-rose-300"
+                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-rose-600 hover:bg-rose-500/10 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-40 dark:text-rose-400 dark:hover:text-rose-300"
                     >
                       <TrashIcon />
                     </button>

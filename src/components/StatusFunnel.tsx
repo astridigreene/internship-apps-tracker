@@ -114,17 +114,25 @@ export function StatusFunnel({ applications, fill, onSelectStage }: StatusFunnel
   return (
     <div
       className={[
-        'flex min-h-0 flex-col overflow-hidden rounded-md border border-panel-border bg-app-surface',
-        fill ? 'h-full' : '',
+        'flex flex-col overflow-hidden rounded-md border border-panel-border bg-app-surface',
+        fill ? 'lg:h-full lg:min-h-0' : '',
       ].join(' ')}
     >
-      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-app-border bg-app-muted px-2.5 py-1.5">
-        <h2 className="text-[12px] font-semibold text-panel-title">Pipeline</h2>
-        <p className="text-[10px] text-panel-sub/80">
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-app-border bg-app-muted px-3 py-2.5 lg:px-2.5 lg:py-1.5">
+        <h2 className="text-[14px] font-bold text-panel-title lg:text-[12px] lg:font-semibold">
+          Pipeline
+        </h2>
+        <p className="hidden text-[10px] text-panel-sub/80 sm:block">
           {onSelectStage ? 'Click a bar to filter' : 'Current status counts'}
         </p>
       </div>
-      <div className={fill ? 'min-h-0 flex-1 px-1.5 py-2' : 'h-44 px-2 py-3'}>
+      <div
+        className={
+          fill
+            ? 'h-52 px-2 py-3 lg:h-auto lg:min-h-0 lg:flex-1 lg:px-1.5 lg:py-2'
+            : 'h-44 px-2 py-3'
+        }
+      >
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={chartData}
@@ -187,12 +195,12 @@ export function StatusFunnel({ applications, fill, onSelectStage }: StatusFunnel
             type="button"
             onClick={() => selectStage(stage)}
             disabled={!onSelectStage}
-            className={`px-1.5 py-1 text-center ${STAGE_FOOTER[stage]} disabled:cursor-default`}
+            className={`px-1.5 py-2.5 text-center lg:py-1 ${STAGE_FOOTER[stage]} disabled:cursor-default`}
           >
-            <p className="text-[9px] font-semibold tracking-[0.06em] uppercase opacity-80">
+            <p className="text-[10px] font-semibold tracking-[0.06em] uppercase opacity-80 lg:text-[9px]">
               {stage}
             </p>
-            <p className="text-[12px] font-bold tabular-nums">{current[stage]}</p>
+            <p className="text-[14px] font-bold tabular-nums lg:text-[12px]">{current[stage]}</p>
           </button>
         ))}
       </div>

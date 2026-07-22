@@ -43,6 +43,7 @@ import {
   sessionExpiresAt,
 } from './lib/session'
 import { Nav } from './components/Nav'
+import { MobileTabBar } from './components/MobileTabBar'
 import { TopBar } from './components/TopBar'
 import { LoginScreen } from './components/LoginScreen'
 import { ConnectSheetScreen } from './components/ConnectSheetScreen'
@@ -749,7 +750,7 @@ export default function App() {
   )
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-app-bg">
+    <div className="flex min-h-dvh flex-col bg-app-bg lg:h-dvh lg:min-h-0 lg:overflow-hidden">
       <TopBar
         lastSynced={data.lastSynced}
         userEmail={user.email}
@@ -764,31 +765,32 @@ export default function App() {
         yearTabs={yearTabs}
       />
       {error ? (
-        <div className="border-b border-app-border bg-kpi-reject-bg px-3 py-1 text-[11px] text-kpi-reject-text">
+        <div className="border-b border-app-border bg-kpi-reject-bg px-3 py-2 text-[12px] text-kpi-reject-text lg:py-1 lg:text-[11px]">
           {error}
         </div>
       ) : null}
-      <main className="flex min-h-0 flex-1 flex-col overflow-hidden p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:p-3">
+      <main className="flex flex-1 flex-col p-3 pb-[calc(4.75rem+env(safe-area-inset-bottom))] lg:min-h-0 lg:overflow-hidden lg:pb-3">
         {switchingYear ? (
-          <p className="mb-1.5 shrink-0 text-[11px] text-app-text-weak">
+          <p className="mb-1.5 shrink-0 text-[12px] text-app-text-weak lg:text-[11px]">
             Loading {selectedYear}…
           </p>
         ) : null}
         {view === 'dashboard' ? (
-          <div className="min-h-0 flex-1 overflow-y-auto lg:overflow-hidden">
+          <div className="lg:min-h-0 lg:flex-1 lg:overflow-hidden">
             <DashboardView
               data={data}
               saving={saving}
               onOpenApplications={(filter) => {
                 setApplicationsFilter(filter)
                 setView('applications')
+                window.scrollTo({ top: 0, behavior: 'smooth' })
               }}
               onSaveStatusChanges={handleSaveStatusChanges}
               onUpdateOaComplete={handleUpdateOaComplete}
             />
           </div>
         ) : (
-          <div className="flex min-h-0 flex-1 flex-col">
+          <div className="flex flex-1 flex-col lg:min-h-0">
             <ApplicationsView
               applications={data.applications}
               statusFilter={applicationsFilter}
@@ -804,6 +806,13 @@ export default function App() {
           </div>
         )}
       </main>
+      <MobileTabBar
+        active={view}
+        onNavigate={(next) => {
+          setView(next)
+          window.scrollTo({ top: 0, behavior: 'smooth' })
+        }}
+      />
     </div>
   )
 }

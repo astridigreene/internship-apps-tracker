@@ -35,13 +35,15 @@ export function RecentUpdates({
   const shown = limit === undefined ? recent : recent.slice(0, limit)
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-md border border-panel-border bg-app-surface">
-      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-app-border bg-app-muted px-2.5 py-1.5">
-        <h2 className="text-[12px] font-semibold text-panel-title">Recent</h2>
+    <div className="flex flex-col overflow-hidden rounded-md border border-panel-border bg-app-surface lg:h-full lg:min-h-0">
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-app-border bg-app-muted px-3 py-2.5 lg:px-2.5 lg:py-1.5">
+        <h2 className="text-[14px] font-bold text-panel-title lg:text-[12px] lg:font-semibold">
+          Recent
+        </h2>
       </div>
-      <ul className="min-h-0 flex-1 overflow-auto">
+      <ul className="lg:min-h-0 lg:flex-1 lg:overflow-auto">
         {shown.length === 0 ? (
-          <li className="px-2.5 py-3 text-center text-[11px] text-app-text-weak">
+          <li className="px-3 py-4 text-center text-[13px] text-app-text-weak lg:px-2.5 lg:py-3 lg:text-[11px]">
             No applications yet.
           </li>
         ) : (
@@ -54,15 +56,17 @@ export function RecentUpdates({
                   disabled={!interactive}
                   onClick={() => onSelectApplication?.(app)}
                   className={[
-                    'flex w-full items-center gap-2 border-b border-app-border px-2.5 py-1.5 text-left',
+                    'flex w-full items-center gap-2 border-b border-app-border px-3 py-3 text-left lg:px-2.5 lg:py-1.5',
                     interactive ? 'cursor-pointer hover:bg-app-hover' : 'cursor-default',
                   ].join(' ')}
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[12px] font-semibold text-app-text">
+                    <p className="truncate text-[14px] font-semibold text-app-text lg:text-[12px]">
                       {app.company}
                     </p>
-                    <p className="truncate text-[10px] text-app-text-weak">{app.role}</p>
+                    <p className="truncate text-[12px] text-app-text-weak lg:text-[10px]">
+                      {app.role}
+                    </p>
                   </div>
                   <StatusPill status={app.status} />
                 </button>

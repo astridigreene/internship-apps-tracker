@@ -48,8 +48,10 @@ export function DashboardView({
     ])
   }
 
+  const kpiClass = 'w-[46%] shrink-0 snap-start sm:w-[30%] lg:w-auto lg:shrink'
+
   return (
-    <div className="flex min-h-0 flex-col gap-2 lg:h-full">
+    <div className="flex flex-col gap-3 lg:h-full lg:min-h-0 lg:gap-2">
       <ApplicationDetailModal
         app={detailAppLive}
         saving={saving}
@@ -62,8 +64,9 @@ export function DashboardView({
         onUpdateOaComplete={onUpdateOaComplete}
       />
 
-      <div className="grid shrink-0 grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
+      <div className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-0.5 snap-x snap-mandatory [scrollbar-width:none] lg:mx-0 lg:grid lg:grid-cols-5 lg:overflow-visible lg:px-0 lg:pb-0 lg:snap-none [&::-webkit-scrollbar]:hidden">
         <KpiCard
+          className={kpiClass}
           compact
           tone="applied"
           label="Applied"
@@ -71,6 +74,7 @@ export function DashboardView({
           onClick={() => onOpenApplications('All')}
         />
         <KpiCard
+          className={kpiClass}
           compact
           tone="oa"
           label="OA"
@@ -79,6 +83,7 @@ export function DashboardView({
           onClick={() => onOpenApplications('OA')}
         />
         <KpiCard
+          className={kpiClass}
           compact
           tone="interview"
           label="Interview"
@@ -87,6 +92,7 @@ export function DashboardView({
           onClick={() => onOpenApplications('Interview')}
         />
         <KpiCard
+          className={kpiClass}
           compact
           tone="offer"
           label="Offer"
@@ -95,34 +101,35 @@ export function DashboardView({
           onClick={() => onOpenApplications('Offer')}
         />
         <KpiCard
+          className={kpiClass}
           compact
           tone="reject"
           label="Rejected"
           value={stats.rejections}
           rate={formatRate(stats.rejectionRate)}
           onClick={() => onOpenApplications('Rejected')}
-          className="col-span-2 sm:col-span-1"
         />
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-2 max-lg:auto-rows-[min(220px,40vh)] lg:grid-cols-12">
-        <div className="min-h-0 max-lg:min-h-[200px] lg:col-span-4">
+      <div className="flex flex-col gap-3 lg:grid lg:min-h-0 lg:flex-1 lg:grid-cols-12 lg:gap-2">
+        <div className="lg:col-span-4 lg:min-h-0">
           <OaCard
             applications={data.applications}
             onOpenAll={() => onOpenApplications('OA')}
             onSelectApplication={setDetailApp}
           />
         </div>
-        <div className="min-h-0 max-lg:min-h-[220px] lg:col-span-5">
+        <div className="lg:col-span-5 lg:min-h-0">
           <StatusFunnel
             applications={data.applications}
             fill
             onSelectStage={onOpenApplications}
           />
         </div>
-        <div className="min-h-0 max-lg:min-h-[200px] lg:col-span-3">
+        <div className="lg:col-span-3 lg:min-h-0">
           <RecentUpdates
             applications={data.applications}
+            limit={8}
             onSelectApplication={setDetailApp}
           />
         </div>
