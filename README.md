@@ -125,6 +125,21 @@ Optional Script properties: `REMINDER_EMAIL`, `REMINDER_YEAR` (e.g. `2027`).
 
 ---
 
+## Optional: Gmail → status auto-update (~every 5 min)
+
+Example file: `google-apps-script/emailStatusSync.example.gs`  
+(Your personal copy `emailStatusSync.gs` is gitignored.)
+
+Polls Gmail for **unread** inbox mail, matches **Company** names on your active year tab, and auto-advances **Status** from subject/body heuristics (OA / Interview / Offer / stage-aware Rejected). Only moves **forward** (or clear rejections). When it updates at least one row, it calls **`_dispatchGithubEvent_`** from your existing `onEdit.gs` for the empty contribution commit. There is no true Apps Script “on new email” hook—this uses a 5-minute trigger instead.
+
+1. Spreadsheet → **Extensions → Apps Script** → paste `emailStatusSync.example.gs` into the **same project** as your existing ping script (`onEdit.gs`).
+2. Run **`createEmailStatusSyncTrigger`** once (authorize Gmail + Sheets).
+3. Optional test: run **`syncStatusesFromEmail`**.
+
+Optional Script properties: `SYNC_YEAR` (or `REMINDER_YEAR`), `GMAIL_QUERY`, `MAX_UPDATES`.
+
+---
+
 ## Privacy & security checklist
 
 - No application rows or personal emails are committed to this repo (`data.json` is an empty stub if present).
@@ -146,7 +161,7 @@ Optional Script properties: `REMINDER_EMAIL`, `REMINDER_YEAR` (e.g. `2027`).
 
 ## Optional extras
 
-- **`google-apps-script/`** — optional Sheet helpers (daily reminder email, Last Updated stamp). Do not put tokens in git.
+- **`google-apps-script/`** — optional Sheet helpers (daily reminder email, Gmail status sync, Last Updated stamp). Do not put tokens in git.
 - **`scripts/sync_sheet.py`** — optional offline export via a service account. Keep service-account JSON **outside** the repo; avoid using this on a public tracker.
 
 ---

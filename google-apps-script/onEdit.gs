@@ -18,6 +18,9 @@
  *
  * Bound installable onEdit (createInstallableOnEditTrigger) is optional and only
  * fires for edits made in the Sheets UI — not for dashboard API writes.
+ *
+ * Other scripts in this project (e.g. emailStatusSync) should call
+ * pingGithubActivity() instead of re-implementing repository_dispatch.
  */
 
 var OWNER = 'OWNER' // e.g. 'your-github-username'
@@ -100,6 +103,14 @@ function handleSheetEdit(e) {
     return
   }
 
+  _dispatchGithubEvent_('application-added')
+}
+
+/**
+ * Public entry for other scripts in this Apps Script project
+ * (e.g. emailStatusSync) — same empty-commit repository_dispatch.
+ */
+function pingGithubActivity() {
   _dispatchGithubEvent_('application-added')
 }
 

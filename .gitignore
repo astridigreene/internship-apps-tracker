@@ -29,6 +29,7 @@ src/data/data.local.json
 
 # Personal Apps Script (contains reminder email / local tweaks)
 google-apps-script/dailyReminder.gs
+google-apps-script/emailStatusSync.gs
 
 # Editor directories and files
 .vscode/*
