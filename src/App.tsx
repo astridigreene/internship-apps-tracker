@@ -792,12 +792,14 @@ export default function App() {
             <DashboardView
               data={data}
               saving={saving}
+              adding={adding}
               onOpenApplications={(filter) => {
                 setApplicationsFilter(filter)
                 setView('applications')
                 window.scrollTo({ top: 0, behavior: 'smooth' })
               }}
               onSaveStatusChanges={handleSaveStatusChanges}
+              onAddApplication={handleAddApplication}
               onUpdateOaComplete={handleUpdateOaComplete}
             />
           </div>

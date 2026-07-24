@@ -86,3 +86,42 @@ export function formatDisplayDate(value: string | Date | null | undefined): stri
 export function statusUpdateStamp(now = new Date()): string {
   return formatDisplayDate(now)
 }
+
+/** Local calendar date as YYYY-MM-DD (for `<input type="date">`). */
+export function toDateInputValue(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
+/** Midnight local time for a Date or YYYY-MM-DD string. */
+export function startOfDay(value: Date | string): Date {
+  if (typeof value === 'string') {
+    const iso = value.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    if (iso) {
+      return new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]))
+    }
+    const parsed = parseSheetDate(value)
+    if (parsed) {
+      return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate())
+    }
+  }
+  const date = value instanceof Date ? value : new Date()
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
+}
+
+/** Inclusive start of the calendar month containing `date`. */
+export function startOfMonth(date = new Date()): Date {
+  return new Date(date.getFullYear(), date.getMonth(), 1)
+}
+
+/** Inclusive end of the calendar month containing `date` (midnight that day). */
+export function endOfMonth(date = new Date()): Date {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0)
+}
+
+/** Whole calendar days between two local midnights (can be negative). */
+export function calendarDaysBetween(from: Date, to: Date): number {
+  const a = startOfDay(from).getTime()
+  const b = startOfDay(to).getTime()
+  return Math.round((b - a) / 86_400_000)
+}
