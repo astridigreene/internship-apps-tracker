@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { SIMPLIFY_JOBS_URL } from '../types'
+import { BrandMark } from './BrandMark'
 
 interface TopBarProps {
   lastSynced: string | null
@@ -83,9 +84,10 @@ export function TopBar({
           <button
             type="button"
             onClick={onHome}
-            className="min-w-0 flex-1 truncate text-left text-[17px] font-bold tracking-tight text-white"
+            className="flex min-w-0 flex-1 items-center gap-2 truncate text-left text-[17px] font-bold tracking-tight text-white"
           >
-            Tracker
+            <BrandMark className="h-6 w-6 shrink-0 text-white" />
+            <span className="truncate">Tracker</span>
           </button>
           <a
             href={SIMPLIFY_JOBS_URL}
@@ -186,8 +188,9 @@ export function TopBar({
         <button
           type="button"
           onClick={onHome}
-          className="shrink-0 text-left text-[15px] font-bold tracking-tight text-white hover:text-white/90"
+          className="flex shrink-0 items-center gap-2 text-left text-[15px] font-bold tracking-tight text-white hover:text-white/90"
         >
+          <BrandMark className="h-5 w-5 shrink-0 text-white" />
           Internship Applications Tracker
         </button>
         {nav}

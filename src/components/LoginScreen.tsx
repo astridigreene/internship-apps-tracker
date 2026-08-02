@@ -1,3 +1,5 @@
+import { BrandMark } from './BrandMark'
+
 interface LoginScreenProps {
   configured: boolean
   loading: boolean
@@ -10,10 +12,15 @@ export function LoginScreen({ configured, loading, error, onSignIn }: LoginScree
     <div className="flex h-full min-h-0 items-center justify-center p-4">
       <div className="w-full max-w-xs overflow-hidden rounded-lg border border-panel-border bg-app-surface shadow-[0_8px_24px_rgba(13,148,136,0.12)] dark:shadow-[0_8px_24px_rgba(0,0,0,0.35)]">
         <div className="bg-gradient-to-r from-teal-600 via-cyan-600 to-sky-500 px-4 py-3 text-white dark:from-teal-800 dark:via-cyan-900 dark:to-slate-900">
-          <p className="text-[10px] font-semibold tracking-[0.08em] text-white/80 uppercase">
-            Tracker
-          </p>
-          <h1 className="mt-0.5 text-[15px] font-semibold tracking-tight">Sign in required</h1>
+          <div className="flex items-center gap-2">
+            <BrandMark className="h-6 w-6 shrink-0 text-white" />
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold tracking-[0.08em] text-white/80 uppercase">
+                Tracker
+              </p>
+              <h1 className="mt-0.5 text-[15px] font-semibold tracking-tight">Sign in required</h1>
+            </div>
+          </div>
         </div>
         <div className="p-4">
           <p className="text-[12px] text-app-text-weak">
