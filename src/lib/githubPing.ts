@@ -1,6 +1,6 @@
 /**
  * Ask GitHub to run the empty-commit workflow (no application fields sent).
- * Used after adding an app or advancing status (e.g. Applied → OA).
+ * Used after adding an app, advancing status (e.g. Applied → OA), or completing an OA.
  *
  * Requires build-time secrets:
  *   VITE_GH_PAT        — classic PAT with `repo` (same as Actions GH_PAT)

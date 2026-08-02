@@ -579,6 +579,11 @@ export default function App() {
         columns: data.columns,
         oaComplete,
       })
+      if (oaComplete === 'Y') {
+        void pingGithubActivity().catch(() => {
+          // best-effort — Sheet write already succeeded
+        })
+      }
     } catch (err) {
       setData(previous)
       setError(err instanceof Error ? err.message : 'Could not update OA Complete')
