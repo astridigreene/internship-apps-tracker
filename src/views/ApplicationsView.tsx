@@ -3,8 +3,11 @@ import {
   isRejectedStatus,
   type Application,
   type ApplicationStatus,
+  type AssessmentEntry,
+  type InterviewEntry,
+  type LinkedActions,
   type NewApplicationInput,
-  type OaComplete,
+  type ScreeningEntry,
 } from '../types'
 import { StatusSelect } from '../components/StatusSelect'
 import { StatusPill } from '../components/StatusPill'
@@ -13,6 +16,7 @@ import { DeleteConfirmModal } from '../components/DeleteConfirmModal'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { ApplicationDetailModal } from '../components/ApplicationDetailModal'
 import { formatDisplayDate } from '../lib/time'
+import { linkedEntriesForCompany } from '../lib/sheet'
 
 type SortKey = 'company' | 'location' | 'role' | 'dateApplied' | 'status'
 type SortDir = 'asc' | 'desc'
@@ -20,19 +24,18 @@ type StatusFilter =
   | 'Active'
   | 'All'
   | 'Applied'
-  | 'OA'
+  | 'Progressed'
   | 'Interview'
   | 'Offer'
   | 'Rejected'
 
 export type ApplicationsStatusFilter = StatusFilter
 
-/** Filter dropdown — Rejected means all rejection variants. */
 const STATUS_OPTIONS: StatusFilter[] = [
   'Active',
   'All',
   'Applied',
-  'OA',
+  'Progressed',
   'Interview',
   'Offer',
   'Rejected',
@@ -62,7 +65,13 @@ interface ApplicationsViewProps {
   onSaveStatusChanges?: (changes: StatusEditChange[]) => Promise<void>
   onAddApplication?: (application: NewApplicationInput) => Promise<void>
   onDeleteApplication?: (app: Application) => Promise<void>
-  onUpdateOaComplete?: (app: Application, oaComplete: OaComplete) => Promise<void>
+  linkedData?: {
+    oaEntries: AssessmentEntry[]
+    hireVueEntries: AssessmentEntry[]
+    interviewEntries: InterviewEntry[]
+    screeningEntries: ScreeningEntry[]
+  }
+  linkedActions?: LinkedActions
 }
 
 function parseDate(value: string): number {
@@ -183,7 +192,8 @@ export function ApplicationsView({
   onSaveStatusChanges,
   onAddApplication,
   onDeleteApplication,
-  onUpdateOaComplete,
+  linkedData,
+  linkedActions,
 }: ApplicationsViewProps) {
   const [query, setQuery] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('dateApplied')
@@ -315,6 +325,8 @@ export function ApplicationsView({
     detailApp === null
       ? null
       : (applications.find((a) => a.sheetRow === detailApp.sheetRow) ?? detailApp)
+  const detailLinked =
+    detailAppLive && linkedData ? linkedEntriesForCompany(linkedData, detailAppLive.company) : undefined
 
   return (
     <div className="flex w-full flex-col gap-3 lg:h-full lg:min-h-0 lg:gap-2.5">
@@ -479,7 +491,8 @@ export function ApplicationsView({
           }
         }}
         onUpdateStatus={onSaveStatusChanges ? handleDetailStatusUpdate : undefined}
-        onUpdateOaComplete={onUpdateOaComplete}
+        linked={detailLinked}
+        linkedActions={linkedActions}
       />
 
       <div className="w-full overflow-hidden rounded-xl border border-panel-border bg-app-surface lg:min-h-0 lg:flex-1 lg:overflow-auto lg:rounded-md">

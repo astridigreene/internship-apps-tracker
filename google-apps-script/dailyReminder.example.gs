@@ -3,7 +3,8 @@
  *
  * Sends to REMINDER_EMAIL:
  *  - a nudge to keep applying
- *  - list of incomplete OAs (Status = OA and OA Complete = N) on the active year tab
+ *  - list of pending OA/HireVue entries (Complete = No) from the "<year> OA" and
+ *    "<year> HireVue" sibling tabs, sorted by Deadline
  *
  * Setup (one-time):
  * 1. Open your tracker spreadsheet → Extensions → Apps Script.
@@ -52,8 +53,9 @@ function createDailyReminderTrigger() {
 function sendDailyReminderEmail() {
   var email = _reminderEmail_()
   var year = _reminderYear_()
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(String(year))
-  if (!sheet) {
+  var spreadsheet = SpreadsheetApp.getActiveSpreadsheet()
+  var yearSheet = spreadsheet.getSheetByName(String(year))
+  if (!yearSheet) {
     MailApp.sendEmail({
       to: email,
       subject: 'Internship reminder — year tab ' + year + ' missing',
@@ -65,20 +67,20 @@ function sendDailyReminderEmail() {
     return
   }
 
-  var incompleteOas = _listIncompleteOas_(sheet)
+  var pending = _listPendingAssessments_(spreadsheet, year)
   var subject =
-    incompleteOas.length === 0
-      ? 'Apply tonight · no open OAs (' + year + ')'
+    pending.length === 0
+      ? 'Apply tonight · nothing pending (' + year + ')'
       : 'Apply tonight · ' +
-        incompleteOas.length +
-        ' OA' +
-        (incompleteOas.length === 1 ? '' : 's') +
-        ' to finish (' +
+        pending.length +
+        ' item' +
+        (pending.length === 1 ? '' : 's') +
+        ' pending (' +
         year +
         ')'
 
-  var html = _buildEmailHtml_(year, incompleteOas)
-  var text = _buildEmailText_(year, incompleteOas)
+  var html = _buildEmailHtml_(year, pending)
+  var text = _buildEmailText_(year, pending)
 
   MailApp.sendEmail({
     to: email,
@@ -87,7 +89,7 @@ function sendDailyReminderEmail() {
     htmlBody: html,
   })
 
-  Logger.log('Sent reminder to ' + email + ' (' + incompleteOas.length + ' incomplete OA(s)).')
+  Logger.log('Sent reminder to ' + email + ' (' + pending.length + ' pending item(s)).')
 }
 
 function _reminderEmail_() {
@@ -126,70 +128,66 @@ function _findCol_(headers, aliases) {
   return -1
 }
 
-function _normalizeOaComplete_(raw) {
+function _normalizeYesNo_(raw) {
   var v = String(raw || '')
     .trim()
-    .toUpperCase()
-    .replace(/\s+/g, '')
-  if (v === 'Y' || v === 'YES') {
-    return 'Y'
-  }
-  if (v === 'N' || v === 'NO') {
-    return 'N'
-  }
-  return 'N/A'
+    .toLowerCase()
+  return v === 'y' || v === 'yes' || v === 'true' || v === '1'
 }
 
 /**
- * Rows with Status OA and OA Complete = N (same as dashboard OA card).
+ * Pending (Complete != Yes) rows from one assessment tab ("<year> OA" or "<year> HireVue").
  */
-function _listIncompleteOas_(sheet) {
+function _listPendingFromTab_(spreadsheet, sheetName, kind) {
+  var sheet = spreadsheet.getSheetByName(sheetName)
+  if (!sheet) {
+    return []
+  }
   var values = sheet.getDataRange().getValues()
-  if (!values.length) {
+  if (values.length < 2) {
     return []
   }
 
   var headers = values[0]
   var companyCol = _findCol_(headers, ['company', 'employer', 'org', 'organization'])
-  var roleCol = _findCol_(headers, ['role', 'position', 'title', 'job', 'job title'])
-  var statusCol = _findCol_(headers, ['status', 'stage', 'result', 'outcome', 'application status'])
-  var oaCol = _findCol_(headers, [
-    'oa complete',
-    'oacomplete',
-    'oa completed',
-    'oa done',
-    'completed oa',
-  ])
-  var updatedCol = _findCol_(headers, [
-    'last updated',
-    'lastupdated',
-    'status updated',
-    'updated',
-    'updated at',
-  ])
+  var deadlineCol = _findCol_(headers, ['deadline', 'due', 'due date'])
+  var completeCol = _findCol_(headers, ['complete', 'completed', 'done'])
 
-  if (companyCol < 0 || statusCol < 0) {
-    throw new Error('Sheet is missing Company and/or Status headers in row 1.')
+  if (companyCol < 0 || deadlineCol < 0) {
+    return []
   }
 
   var out = []
   for (var r = 1; r < values.length; r++) {
     var row = values[r]
-    var status = String(row[statusCol] || '').trim()
-    if (status !== 'OA') {
+    var company = String(row[companyCol] || '').trim()
+    if (!company) {
       continue
     }
-    var oaComplete = oaCol < 0 ? 'N/A' : _normalizeOaComplete_(row[oaCol])
-    if (oaComplete !== 'N') {
+    if (completeCol >= 0 && _normalizeYesNo_(row[completeCol])) {
       continue
     }
     out.push({
-      company: String(row[companyCol] || '').trim() || 'Untitled',
-      role: roleCol < 0 ? '' : String(row[roleCol] || '').trim(),
-      lastUpdated: updatedCol < 0 ? '' : _formatCellDate_(row[updatedCol]),
+      company: company,
+      kind: kind,
+      deadline: _formatCellDate_(row[deadlineCol]),
+      deadlineSortKey: row[deadlineCol] instanceof Date ? row[deadlineCol].getTime() : Number.MAX_SAFE_INTEGER,
     })
   }
   return out
+}
+
+/**
+ * Pending OA + HireVue entries for the year, sorted by Deadline ascending.
+ */
+function _listPendingAssessments_(spreadsheet, year) {
+  var oa = _listPendingFromTab_(spreadsheet, year + ' OA', 'OA')
+  var hireVue = _listPendingFromTab_(spreadsheet, year + ' HireVue', 'HireVue')
+  var combined = oa.concat(hireVue)
+  combined.sort(function (a, b) {
+    return a.deadlineSortKey - b.deadlineSortKey
+  })
+  return combined
 }
 
 function _formatCellDate_(value) {
@@ -200,7 +198,7 @@ function _formatCellDate_(value) {
   return s
 }
 
-function _buildEmailText_(year, oas) {
+function _buildEmailText_(year, pending) {
   var lines = []
   lines.push('Internship evening reminder (' + year + ')')
   lines.push('')
@@ -208,16 +206,16 @@ function _buildEmailText_(year, oas) {
   lines.push('Spend 20–30 minutes submitting applications tonight.')
   lines.push('Find roles: ' + APPLY_URL)
   lines.push('')
-  lines.push('2) COMPLETE OAs')
-  if (!oas.length) {
-    lines.push('No open OAs right now.')
+  lines.push('2) COMPLETE OA/HIREVUE')
+  if (!pending.length) {
+    lines.push('Nothing pending right now.')
   } else {
-    lines.push(oas.length + ' OA' + (oas.length === 1 ? '' : 's') + ' waiting:')
-    for (var i = 0; i < oas.length; i++) {
-      var item = oas[i]
-      var line = '- ' + item.company + (item.role ? ' · ' + item.role : '')
-      if (item.lastUpdated) {
-        line += ' (updated ' + item.lastUpdated + ')'
+    lines.push(pending.length + ' item' + (pending.length === 1 ? '' : 's') + ' waiting:')
+    for (var i = 0; i < pending.length; i++) {
+      var item = pending[i]
+      var line = '- ' + item.company + ' · ' + item.kind
+      if (item.deadline) {
+        line += ' (due ' + item.deadline + ')'
       }
       lines.push(line)
     }
@@ -227,20 +225,20 @@ function _buildEmailText_(year, oas) {
   return lines.join('\n')
 }
 
-function _oaRowsHtml_(oas) {
-  if (!oas.length) {
+function _oaRowsHtml_(pending) {
+  if (!pending.length) {
     return (
       '<tr><td style="padding:14px 16px;font-size:14px;color:#166534;font-weight:600;">' +
-      'You\'re clear — no incomplete OAs. Nice work.' +
+      'You\'re clear — nothing pending. Nice work.' +
       '</td></tr>'
     )
   }
 
   var rows = ''
-  for (var i = 0; i < oas.length; i++) {
-    var item = oas[i]
+  for (var i = 0; i < pending.length; i++) {
+    var item = pending[i]
     var bg = i % 2 === 0 ? '#ffffff' : '#f8fafc'
-    var border = i === oas.length - 1 ? 'none' : '1px solid #e2e8f0'
+    var border = i === pending.length - 1 ? 'none' : '1px solid #e2e8f0'
     rows +=
       '<tr>' +
       '<td style="padding:12px 16px;background:' +
@@ -250,15 +248,13 @@ function _oaRowsHtml_(oas) {
       ';">' +
       '<div style="font-size:15px;font-weight:700;color:#0f172a;line-height:1.3;">' +
       _esc_(item.company) +
+      '<span style="font-weight:600;color:#64748b;"> · ' +
+      _esc_(item.kind) +
+      '</span>' +
       '</div>' +
-      (item.role
-        ? '<div style="margin-top:2px;font-size:13px;color:#64748b;line-height:1.35;">' +
-          _esc_(item.role) +
-          '</div>'
-        : '') +
-      (item.lastUpdated
-        ? '<div style="margin-top:4px;font-size:11px;color:#94a3b8;font-weight:600;">Updated ' +
-          _esc_(item.lastUpdated) +
+      (item.deadline
+        ? '<div style="margin-top:4px;font-size:11px;color:#94a3b8;font-weight:600;">Due ' +
+          _esc_(item.deadline) +
           '</div>'
         : '') +
       '</td></tr>'
@@ -266,11 +262,11 @@ function _oaRowsHtml_(oas) {
   return rows
 }
 
-function _buildEmailHtml_(year, oas) {
+function _buildEmailHtml_(year, pending) {
   var oaCountLabel =
-    oas.length === 0
-      ? 'None open'
-      : String(oas.length) + ' open OA' + (oas.length === 1 ? '' : 's')
+    pending.length === 0
+      ? 'None pending'
+      : String(pending.length) + ' pending item' + (pending.length === 1 ? '' : 's')
 
   return (
     '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
@@ -306,14 +302,14 @@ function _buildEmailHtml_(year, oas) {
     '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #93c5fd;background:#eff6ff;border-radius:10px;overflow:hidden;">' +
     '<tr><td style="padding:14px 18px 10px;border-bottom:1px solid #bfdbfe;">' +
     '<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>' +
-    '<td style="font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:#1d4ed8;">2 · OAs to complete</td>' +
+    '<td style="font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:#1d4ed8;">2 · OA/HireVue to complete</td>' +
     '<td align="right" style="font-size:12px;font-weight:800;color:#1e40af;">' +
     _esc_(oaCountLabel) +
     '</td>' +
     '</tr></table>' +
-    '<div style="margin-top:4px;font-size:13px;color:#1e3a8a;">Same list as your dashboard OA card (OA + Complete = N).</div>' +
+    '<div style="margin-top:4px;font-size:13px;color:#1e3a8a;">Same list as your dashboard pending OA/HireVue card.</div>' +
     '</td></tr>' +
-    _oaRowsHtml_(oas) +
+    _oaRowsHtml_(pending) +
     '<tr><td style="padding:12px 18px;background:#eff6ff;border-top:1px solid #bfdbfe;">' +
     '<a href="' +
     DASHBOARD_URL +

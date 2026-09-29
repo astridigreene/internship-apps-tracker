@@ -23,6 +23,52 @@ export function formatElapsedDays(
   return `${days} days ago`
 }
 
+/** Days until a future deadline (or overdue wording for a past one). */
+export function formatDueInDays(deadline: Date | null, now = new Date()): string {
+  if (!deadline || Number.isNaN(deadline.getTime())) {
+    return 'no deadline'
+  }
+  const days = Math.round((startOfDay(deadline).getTime() - startOfDay(now).getTime()) / 86_400_000)
+  if (days === 0) {
+    return 'due today'
+  }
+  if (days < 0) {
+    return `overdue ${Math.abs(days)}d`
+  }
+  if (days === 1) {
+    return 'due tomorrow'
+  }
+  return `due in ${days}d`
+}
+
+/**
+ * True when `deadline` falls within the next 24 hours (through end of its day),
+ * and hasn't already passed. A deadline dated today is always "due soon" —
+ * deadlines only carry a date, not a time, so we treat the due moment as the
+ * end of that day rather than midnight.
+ */
+export function isDueSoon(deadline: Date | null, now = new Date()): boolean {
+  if (!deadline || Number.isNaN(deadline.getTime())) {
+    return false
+  }
+  const dueMoment = new Date(
+    deadline.getFullYear(),
+    deadline.getMonth(),
+    deadline.getDate(),
+    23,
+    59,
+    59,
+    999,
+  )
+  const diffMs = dueMoment.getTime() - now.getTime()
+  return diffMs >= 0 && diffMs <= 24 * 60 * 60 * 1000
+}
+
+/** True when two dates fall on the same local calendar day. */
+export function isSameDay(a: Date, b: Date): boolean {
+  return startOfDay(a).getTime() === startOfDay(b).getTime()
+}
+
 /** Parse a Google Sheets cell value into a Date (formatted strings or serials). */
 export function parseSheetDate(value: string): Date | null {
   const raw = value.trim()

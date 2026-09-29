@@ -35,8 +35,9 @@ type DayPoint = {
 
 type PaceVerdict = 'crushing' | 'onTrack' | 'behind' | 'slacking'
 
-const GOAL_MIN = 1
-const GOAL_TARGET = 2
+/** Daily application goal. Crushing it = goal + 1 or more. */
+const GOAL = 3
+const GOAL_CRUSHING = GOAL + 1
 
 function usePrefersDark() {
   const [dark, setDark] = useState(() =>
@@ -207,7 +208,7 @@ function buildRecommendation(args: {
   todayCount: number
 }): { verdict: PaceVerdict; headline: string; detail: string } {
   const { avgSoFar, totalSoFar, daysElapsed, daysRemaining, zeroStreak, todayCount } = args
-  const neededForFloor = Math.max(0, Math.ceil(GOAL_MIN * (daysElapsed + daysRemaining) - totalSoFar))
+  const neededForFloor = Math.max(0, Math.ceil(GOAL * (daysElapsed + daysRemaining) - totalSoFar))
   const neededPerDay =
     daysRemaining > 0 ? neededForFloor / daysRemaining : neededForFloor > 0 ? Infinity : 0
 
@@ -215,51 +216,51 @@ function buildRecommendation(args: {
     return {
       verdict: 'onTrack',
       headline: 'Range starts today',
-      detail: `Hit at least ${GOAL_MIN}–${GOAL_TARGET} apps today to stay on the floor.`,
+      detail: `Hit ${GOAL} apps today to stay on pace.`,
     }
   }
 
-  if (zeroStreak >= 3 && avgSoFar < GOAL_MIN) {
+  if (zeroStreak >= 3 && avgSoFar < GOAL) {
     return {
       verdict: 'slacking',
       headline: `${zeroStreak} days with zero apps`,
       detail:
         neededForFloor > 0
-          ? `That's a dry spell. You need ~${neededPerDay.toFixed(1)}/day for the rest of this range just to salvage a 1/day average.`
+          ? `That's a dry spell. You need ~${neededPerDay.toFixed(1)}/day for the rest of this range just to salvage a ${GOAL}/day average.`
           : 'Open the sheet and send something before the day ends.',
     }
   }
 
-  if (avgSoFar >= GOAL_TARGET) {
+  if (avgSoFar >= GOAL_CRUSHING) {
     return {
       verdict: 'crushing',
-      headline: `${avgSoFar.toFixed(1)}/day — above the bar`,
+      headline: `${avgSoFar.toFixed(1)}/day — above the goal`,
       detail:
         todayCount === 0 && daysRemaining >= 0
-          ? `Strong pace. Still worth landing ${GOAL_MIN}+ today so the streak doesn't break.`
-          : `You're clearing the ${GOAL_TARGET}/day target. Keep the machine fed.`,
+          ? `Strong pace. Still worth landing ${GOAL}+ today so the streak doesn't break.`
+          : `You're clearing the ${GOAL}/day goal. Keep the machine fed.`,
     }
   }
 
-  if (avgSoFar >= GOAL_MIN) {
+  if (avgSoFar >= GOAL) {
     return {
       verdict: 'onTrack',
-      headline: `${avgSoFar.toFixed(1)}/day — on the floor`,
+      headline: `${avgSoFar.toFixed(1)}/day — on goal`,
       detail:
         todayCount === 0
-          ? `Floor held so far. One more today keeps you honest.`
-          : `Solid. Push toward ${GOAL_TARGET}/day when you have bandwidth.`,
+          ? `Goal held so far. One more today keeps you honest.`
+          : `Solid. Push past ${GOAL}/day when you have bandwidth.`,
     }
   }
 
   if (avgSoFar > 0) {
     return {
       verdict: 'behind',
-      headline: `${avgSoFar.toFixed(1)}/day — below 1/day`,
+      headline: `${avgSoFar.toFixed(1)}/day — below ${GOAL}/day`,
       detail:
         daysRemaining > 0 && neededForFloor > 0
-          ? `Behind the minimum. About ${neededPerDay.toFixed(1)} apps/day for the remaining ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} to hit a 1/day average.`
-          : `Finished this range under the floor (${totalSoFar} apps across ${daysElapsed} days).`,
+          ? `Behind goal. About ${neededPerDay.toFixed(1)} apps/day for the remaining ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} to hit a ${GOAL}/day average.`
+          : `Finished this range under goal (${totalSoFar} apps across ${daysElapsed} days).`,
     }
   }
 
@@ -268,7 +269,7 @@ function buildRecommendation(args: {
     headline: 'Zero apps in this range',
     detail:
       daysRemaining > 0
-        ? `Nothing logged. You need ${GOAL_MIN}–${GOAL_TARGET} today just to start existing on the chart.`
+        ? `Nothing logged. You need ${GOAL} today just to start existing on the chart.`
         : 'Empty range. Either widen the dates or apply to something.',
   }
 }
@@ -633,7 +634,7 @@ export function AppsPerDayChart({ applications }: AppsPerDayChartProps) {
               Apps per day
             </h2>
             <p className="text-[11px] text-panel-sub/80 lg:text-[10px]">
-              Goal {GOAL_MIN}–{GOAL_TARGET} / day
+              Goal {GOAL} / day
               {showProjection ? ' · scroll right for more future' : ''}
             </p>
           </div>
@@ -735,7 +736,7 @@ export function AppsPerDayChart({ applications }: AppsPerDayChartProps) {
                   tickLine={false}
                   width={28}
                   tickCount={yTickCount}
-                  domain={[0, (dataMax: number) => Math.max(GOAL_TARGET, dataMax || 0) + 1]}
+                  domain={[0, (dataMax: number) => Math.max(GOAL, dataMax || 0) + 1]}
                 />
                 <Tooltip
                   contentStyle={{
@@ -762,16 +763,10 @@ export function AppsPerDayChart({ applications }: AppsPerDayChartProps) {
                   wrapperStyle={{ fontSize: 10, color: tick }}
                 />
                 <ReferenceLine
-                  y={GOAL_MIN}
+                  y={GOAL}
                   stroke={goalStroke}
                   strokeDasharray="4 4"
                   strokeOpacity={0.55}
-                />
-                <ReferenceLine
-                  y={GOAL_TARGET}
-                  stroke={goalStroke}
-                  strokeDasharray="2 4"
-                  strokeOpacity={0.35}
                 />
                 <Line
                   type="monotone"

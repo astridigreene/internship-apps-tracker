@@ -8,6 +8,7 @@ interface NavProps {
 const NAV_ITEMS: { id: ViewId; label: string }[] = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'applications', label: 'Applications' },
+  { id: 'inProgress', label: 'In Progress' },
 ]
 
 export function Nav({ active, onNavigate }: NavProps) {

@@ -1,16 +1,19 @@
 import { useEffect, useId, useState } from 'react'
 import {
-  isOaIncomplete,
+  effectiveHighestStage,
   isRejectedStatus,
   nextPipelineStatus,
-  OA_COMPLETE_VALUES,
-  rejectionStatusFor,
   type Application,
   type ApplicationStatus,
-  type OaComplete,
+  type AssessmentEntry,
+  type InterviewEntry,
+  type LinkedActions,
+  type ScreeningEntry,
 } from '../types'
 import { StatusPill } from './StatusPill'
 import { StatusSelect } from './StatusSelect'
+import { AssessmentPanel } from './AssessmentPanel'
+import { DateEntriesPanel } from './DateEntriesPanel'
 import { formatDisplayDate } from '../lib/time'
 
 interface ApplicationDetailModalProps {
@@ -18,7 +21,13 @@ interface ApplicationDetailModalProps {
   saving?: boolean
   onClose: () => void
   onUpdateStatus?: (app: Application, toStatus: ApplicationStatus) => Promise<void>
-  onUpdateOaComplete?: (app: Application, oaComplete: OaComplete) => Promise<void>
+  linked?: {
+    oa: AssessmentEntry[]
+    hireVue: AssessmentEntry[]
+    interviews: InterviewEntry[]
+    screenings: ScreeningEntry[]
+  }
+  linkedActions?: LinkedActions
 }
 
 export function ApplicationDetailModal({
@@ -26,7 +35,8 @@ export function ApplicationDetailModal({
   saving,
   onClose,
   onUpdateStatus,
-  onUpdateOaComplete,
+  linked,
+  linkedActions,
 }: ApplicationDetailModalProps) {
   const titleId = useId()
   const [editing, setEditing] = useState(false)
@@ -62,15 +72,10 @@ export function ApplicationDetailModal({
   const current = app
   const currentStatus = current.status
   const next = nextPipelineStatus(currentStatus)
-  const rejectTarget = rejectionStatusFor(currentStatus)
   const alreadyRejected = isRejectedStatus(currentStatus)
   const canWrite = Boolean(onUpdateStatus)
-  const isOaStatus = currentStatus === 'OA'
-  const canEditOaComplete =
-    Boolean(onUpdateOaComplete) && current.oaComplete !== null && isOaStatus
-  const showOaCompleteButton =
-    canEditOaComplete && isOaIncomplete(current.oaComplete)
-  const showOaCompleteField = current.oaComplete !== null && isOaStatus
+  const highest = effectiveHighestStage(current)
+  const showLinked = highest !== 'Applied' && Boolean(linked)
 
   async function writeStatus(toStatus: ApplicationStatus) {
     if (!onUpdateStatus || saving || toStatus === currentStatus) {
@@ -85,18 +90,6 @@ export function ApplicationDetailModal({
     }
   }
 
-  async function writeOaComplete(value: OaComplete) {
-    if (!onUpdateOaComplete || saving || current.oaComplete === value) {
-      return
-    }
-    setError(null)
-    try {
-      await onUpdateOaComplete(current, value)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not update OA Complete')
-    }
-  }
-
   async function saveEdit() {
     const nextStatus = draftStatus as ApplicationStatus
     if (nextStatus === currentStatus) {
@@ -106,11 +99,8 @@ export function ApplicationDetailModal({
     await writeStatus(nextStatus)
   }
 
-  const fieldLabel =
-    'text-[11px] font-bold tracking-[0.06em] uppercase text-app-text-weak'
+  const fieldLabel = 'text-[11px] font-bold tracking-[0.06em] uppercase text-app-text-weak'
   const fieldValue = 'mt-1 text-[14px] font-semibold text-app-text'
-  const selectClass =
-    'mt-1.5 h-9 w-full max-w-[140px] rounded border border-app-border bg-app-surface px-2.5 text-[13px] font-semibold text-app-text outline-none focus:border-app-brand disabled:opacity-60'
 
   return (
     <div
@@ -168,30 +158,10 @@ export function ApplicationDetailModal({
               {formatDisplayDate(app.lastUpdated) || '—'}
             </p>
           </div>
-          {showOaCompleteField ? (
-            <div>
-              <p className={fieldLabel}>OA Complete</p>
-              {canEditOaComplete ? (
-                <select
-                  aria-label="OA Complete"
-                  value={app.oaComplete ?? 'N/A'}
-                  disabled={saving}
-                  onChange={(event) => {
-                    void writeOaComplete(event.target.value as OaComplete)
-                  }}
-                  className={selectClass}
-                >
-                  {OA_COMPLETE_VALUES.map((value) => (
-                    <option key={value} value={value}>
-                      {value}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <p className={fieldValue}>{app.oaComplete}</p>
-              )}
-            </div>
-          ) : null}
+          <div>
+            <p className={fieldLabel}>Highest Stage</p>
+            <p className={fieldValue}>{highest}</p>
+          </div>
           <div>
             <p className={fieldLabel}>Status</p>
             <div className="mt-1.5">
@@ -253,18 +223,6 @@ export function ApplicationDetailModal({
                 >
                   Edit
                 </button>
-                {showOaCompleteButton ? (
-                  <button
-                    type="button"
-                    disabled={saving}
-                    onClick={() => {
-                      void writeOaComplete('Y')
-                    }}
-                    className="h-9 rounded border border-sky-300 bg-sky-500/10 px-3 text-[12px] font-bold text-sky-800 hover:bg-sky-500/20 disabled:cursor-not-allowed disabled:opacity-40 dark:border-sky-500/40 dark:text-sky-200"
-                  >
-                    {saving ? 'Saving…' : 'OA complete'}
-                  </button>
-                ) : null}
                 {next ? (
                   <button
                     type="button"
@@ -281,9 +239,9 @@ export function ApplicationDetailModal({
                   <button
                     type="button"
                     disabled={saving || !canWrite}
-                    title={`Set status to ${rejectTarget}`}
+                    title="Set status to Rejected"
                     onClick={() => {
-                      void writeStatus(rejectTarget)
+                      void writeStatus('Rejected')
                     }}
                     className="h-9 rounded border border-rose-300 bg-rose-500/10 px-3 text-[12px] font-bold text-rose-700 hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-40 dark:border-rose-500/40 dark:text-rose-300"
                   >
@@ -301,6 +259,61 @@ export function ApplicationDetailModal({
               </>
             )}
           </div>
+
+          {showLinked && linked ? (
+            <div className="space-y-2 border-t border-app-border pt-3">
+              <p className={fieldLabel}>Progress details</p>
+              <AssessmentPanel
+                kind="OA"
+                entries={linked.oa}
+                companyDefault={app.company}
+                disabled={saving}
+                onAdd={linkedActions ? (input) => linkedActions.addOa(input) : undefined}
+                onToggleComplete={
+                  linkedActions
+                    ? (entry, complete) => linkedActions.toggleOaComplete(entry, complete)
+                    : undefined
+                }
+                onDelete={linkedActions ? (entry) => linkedActions.deleteOa(entry) : undefined}
+              />
+              <AssessmentPanel
+                kind="HireVue"
+                entries={linked.hireVue}
+                companyDefault={app.company}
+                disabled={saving}
+                onAdd={linkedActions ? (input) => linkedActions.addHireVue(input) : undefined}
+                onToggleComplete={
+                  linkedActions
+                    ? (entry, complete) => linkedActions.toggleHireVueComplete(entry, complete)
+                    : undefined
+                }
+                onDelete={linkedActions ? (entry) => linkedActions.deleteHireVue(entry) : undefined}
+              />
+              <DateEntriesPanel
+                kind="Screening"
+                entries={linked.screenings}
+                companyDefault={app.company}
+                disabled={saving}
+                showComplete={false}
+                onAdd={linkedActions ? (input) => linkedActions.addScreening(input) : undefined}
+                onDelete={linkedActions ? (entry) => linkedActions.deleteScreening(entry) : undefined}
+              />
+              <DateEntriesPanel
+                kind="Interview"
+                entries={linked.interviews}
+                companyDefault={app.company}
+                disabled={saving}
+                showComplete
+                onAdd={linkedActions ? (input) => linkedActions.addInterview(input) : undefined}
+                onToggleComplete={
+                  linkedActions
+                    ? (entry, complete) => linkedActions.toggleInterviewComplete(entry, complete)
+                    : undefined
+                }
+                onDelete={linkedActions ? (entry) => linkedActions.deleteInterview(entry) : undefined}
+              />
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

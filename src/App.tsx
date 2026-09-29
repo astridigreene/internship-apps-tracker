@@ -1,9 +1,17 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import {
+  deriveHighestStageOnStatusChange,
   isForwardProgress,
   isRejectedStatus,
   type Application,
+  type AssessmentEntry,
+  type InterviewEntry,
+  type LinkedActions,
   type NewApplicationInput,
+  type NewAssessmentInput,
+  type NewInterviewInput,
+  type NewScreeningInput,
+  type ScreeningEntry,
   type TrackerData,
   type ViewId,
 } from './types'
@@ -15,17 +23,23 @@ import {
   type GoogleUser,
 } from './lib/googleAuth'
 import {
+  appendAssessmentEntry,
+  appendInterviewEntry,
+  appendScreeningEntry,
   appendSheetApplication,
   buildTrackerData,
   computeStats,
+  deleteLinkedRow,
   deleteSheetRow,
+  fetchLinkedTrackerData,
   fetchSheetValues,
   isSheetSetupError,
+  linkedTabNames,
   listYearSheets,
   nextSummerYear,
   pickDefaultYear,
   SheetSetupError,
-  updateSheetOaComplete,
+  updateLinkedComplete,
   updateSheetStatus,
 } from './lib/sheet'
 import { statusUpdateStamp } from './lib/time'
@@ -50,6 +64,7 @@ import { ConnectSheetScreen } from './components/ConnectSheetScreen'
 import { SheetSetupHelp } from './components/SheetSetupHelp'
 import { YearTabs } from './components/YearTabs'
 import { DashboardView } from './views/DashboardView'
+import { InProgressView } from './views/InProgressView'
 import {
   ApplicationsView,
   type ApplicationsStatusFilter,
@@ -134,8 +149,11 @@ export default function App() {
 
   const loadYearData = useCallback(
     async (token: string, spreadsheetId: string, year: string) => {
-      const values = await fetchSheetValues(spreadsheetId, token, year)
-      setData(buildTrackerData(values))
+      const [values, linked] = await Promise.all([
+        fetchSheetValues(spreadsheetId, token, year),
+        fetchLinkedTrackerData(spreadsheetId, token, year),
+      ])
+      setData(buildTrackerData(values, linked))
       setSelectedYear(year)
       setSheetSetupError(null)
       const existing = loadSession()
@@ -491,11 +509,8 @@ export default function App() {
       if (!nextStatus) {
         return row
       }
-      let oaComplete = row.oaComplete
-      if (data.columns.oaComplete !== null && nextStatus === 'OA' && oaComplete !== 'Y') {
-        oaComplete = 'N'
-      }
-      return { ...row, status: nextStatus, lastUpdated: stamp, oaComplete }
+      const highestStage = deriveHighestStageOnStatusChange(row.highestStage, row.status, nextStatus)
+      return { ...row, status: nextStatus, lastUpdated: stamp, highestStage }
     })
     setData({
       ...data,
@@ -515,22 +530,10 @@ export default function App() {
           sheetRow: change.app.sheetRow,
           columns,
           status: change.toStatus,
+          currentStatus: change.app.status,
+          currentHighestStage: change.app.highestStage,
           lastUpdatedStamp: stamp,
         })
-        if (
-          columns.oaComplete !== null &&
-          change.toStatus === 'OA' &&
-          change.app.oaComplete !== 'Y'
-        ) {
-          await updateSheetOaComplete({
-            spreadsheetId: sheetId,
-            accessToken: token,
-            sheetTitle: selectedYear,
-            sheetRow: change.app.sheetRow,
-            columns,
-            oaComplete: 'N',
-          })
-        }
       }
       setData((current) => (current ? { ...current, columns } : current))
       if (changes.some((change) => isForwardProgress(change.fromStatus, change.toStatus))) {
@@ -543,51 +546,6 @@ export default function App() {
       setData(previous)
       setError(err instanceof Error ? err.message : 'Could not save status changes')
       throw err instanceof Error ? err : new Error('Could not save status changes')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function handleUpdateOaComplete(app: Application, oaComplete: 'N/A' | 'N' | 'Y') {
-    if (!accessToken || !data || !sheetId) {
-      return
-    }
-    if (app.oaComplete === oaComplete) {
-      return
-    }
-
-    const previous = data
-    setError(null)
-    setSaving(true)
-
-    const nextApps = data.applications.map((row) =>
-      row.sheetRow === app.sheetRow ? { ...row, oaComplete } : row,
-    )
-    setData({
-      ...data,
-      applications: nextApps,
-      lastSynced: new Date().toISOString(),
-    })
-
-    try {
-      const token = await ensureFreshToken()
-      await updateSheetOaComplete({
-        spreadsheetId: sheetId,
-        accessToken: token,
-        sheetTitle: selectedYear,
-        sheetRow: app.sheetRow,
-        columns: data.columns,
-        oaComplete,
-      })
-      if (oaComplete === 'Y') {
-        void pingGithubActivity().catch(() => {
-          // best-effort — Sheet write already succeeded
-        })
-      }
-    } catch (err) {
-      setData(previous)
-      setError(err instanceof Error ? err.message : 'Could not update OA Complete')
-      throw err instanceof Error ? err : new Error('Could not update OA Complete')
     } finally {
       setSaving(false)
     }
@@ -616,12 +574,8 @@ export default function App() {
       const nextApp: Application = {
         ...application,
         lastUpdated: stamp,
-        oaComplete:
-          data.columns.oaComplete === null
-            ? null
-            : application.status === 'OA'
-              ? 'N'
-              : 'N/A',
+        highestStage: deriveHighestStageOnStatusChange(null, 'Applied', application.status),
+        oaComplete: null,
         sheetRow,
       }
       const nextApps = [...data.applications, nextApp]
@@ -686,6 +640,278 @@ export default function App() {
     } finally {
       setDeleting(false)
     }
+  }
+
+  function shiftRowsAfterDelete<T extends { sheetRow: number }>(list: T[], deletedRow: number): T[] {
+    return list
+      .filter((entry) => entry.sheetRow !== deletedRow)
+      .map((entry) => (entry.sheetRow > deletedRow ? { ...entry, sheetRow: entry.sheetRow - 1 } : entry))
+  }
+
+  async function handleAddAssessment(kind: 'OA' | 'HireVue', input: NewAssessmentInput) {
+    if (!accessToken || !data || !sheetId) {
+      return
+    }
+    setError(null)
+    setSaving(true)
+    try {
+      const token = await ensureFreshToken()
+      const entry = await appendAssessmentEntry({
+        spreadsheetId: sheetId,
+        accessToken: token,
+        year: selectedYear,
+        kind,
+        input,
+      })
+      setData((current) => {
+        if (!current) return current
+        return kind === 'OA'
+          ? { ...current, oaEntries: [...current.oaEntries, entry] }
+          : { ...current, hireVueEntries: [...current.hireVueEntries, entry] }
+      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : `Could not add ${kind}`
+      setError(message)
+      throw err instanceof Error ? err : new Error(message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleAddInterview(input: NewInterviewInput) {
+    if (!accessToken || !data || !sheetId) {
+      return
+    }
+    setError(null)
+    setSaving(true)
+    try {
+      const token = await ensureFreshToken()
+      const entry = await appendInterviewEntry({
+        spreadsheetId: sheetId,
+        accessToken: token,
+        year: selectedYear,
+        input,
+      })
+      setData((current) =>
+        current ? { ...current, interviewEntries: [...current.interviewEntries, entry] } : current,
+      )
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not add interview'
+      setError(message)
+      throw err instanceof Error ? err : new Error(message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleAddScreening(input: NewScreeningInput) {
+    if (!accessToken || !data || !sheetId) {
+      return
+    }
+    setError(null)
+    setSaving(true)
+    try {
+      const token = await ensureFreshToken()
+      const entry = await appendScreeningEntry({
+        spreadsheetId: sheetId,
+        accessToken: token,
+        year: selectedYear,
+        input,
+      })
+      setData((current) =>
+        current ? { ...current, screeningEntries: [...current.screeningEntries, entry] } : current,
+      )
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not add screening'
+      setError(message)
+      throw err instanceof Error ? err : new Error(message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleToggleAssessmentComplete(
+    kind: 'OA' | 'HireVue',
+    entry: AssessmentEntry,
+    complete: boolean,
+  ) {
+    if (!accessToken || !data || !sheetId) {
+      return
+    }
+    const tabState = kind === 'OA' ? data.oaTab : data.hireVueTab
+    const completeCol = tabState.columns?.complete
+    if (completeCol === null || completeCol === undefined) {
+      setError(`This sheet's ${kind} tab has no Complete column.`)
+      return
+    }
+    const sheetTitle = kind === 'OA' ? linkedTabNames(selectedYear).oa : linkedTabNames(selectedYear).hireVue
+    setError(null)
+    setSaving(true)
+    try {
+      const token = await ensureFreshToken()
+      await updateLinkedComplete({
+        spreadsheetId: sheetId,
+        accessToken: token,
+        sheetTitle,
+        sheetRow: entry.sheetRow,
+        completeColumn: completeCol,
+        complete,
+      })
+      setData((current) => {
+        if (!current) return current
+        const update = (list: AssessmentEntry[]) =>
+          list.map((e) => (e.sheetRow === entry.sheetRow ? { ...e, complete } : e))
+        return kind === 'OA'
+          ? { ...current, oaEntries: update(current.oaEntries) }
+          : { ...current, hireVueEntries: update(current.hireVueEntries) }
+      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : `Could not update ${kind}`
+      setError(message)
+      throw err instanceof Error ? err : new Error(message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleToggleInterviewComplete(entry: InterviewEntry, complete: boolean) {
+    if (!accessToken || !data || !sheetId) {
+      return
+    }
+    const completeCol = data.interviewsTab.columns?.complete
+    if (completeCol === null || completeCol === undefined) {
+      setError('This sheet\'s Interviews tab has no Complete column.')
+      return
+    }
+    setError(null)
+    setSaving(true)
+    try {
+      const token = await ensureFreshToken()
+      await updateLinkedComplete({
+        spreadsheetId: sheetId,
+        accessToken: token,
+        sheetTitle: linkedTabNames(selectedYear).interviews,
+        sheetRow: entry.sheetRow,
+        completeColumn: completeCol,
+        complete,
+      })
+      setData((current) =>
+        current
+          ? {
+              ...current,
+              interviewEntries: current.interviewEntries.map((e) =>
+                e.sheetRow === entry.sheetRow ? { ...e, complete } : e,
+              ),
+            }
+          : current,
+      )
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not update interview'
+      setError(message)
+      throw err instanceof Error ? err : new Error(message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDeleteAssessment(kind: 'OA' | 'HireVue', entry: AssessmentEntry) {
+    if (!accessToken || !data || !sheetId) {
+      return
+    }
+    const sheetTitle = kind === 'OA' ? linkedTabNames(selectedYear).oa : linkedTabNames(selectedYear).hireVue
+    setError(null)
+    setSaving(true)
+    try {
+      const token = await ensureFreshToken()
+      await deleteLinkedRow({
+        spreadsheetId: sheetId,
+        accessToken: token,
+        sheetTitle,
+        sheetRow: entry.sheetRow,
+      })
+      setData((current) => {
+        if (!current) return current
+        return kind === 'OA'
+          ? { ...current, oaEntries: shiftRowsAfterDelete(current.oaEntries, entry.sheetRow) }
+          : { ...current, hireVueEntries: shiftRowsAfterDelete(current.hireVueEntries, entry.sheetRow) }
+      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : `Could not delete ${kind}`
+      setError(message)
+      throw err instanceof Error ? err : new Error(message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDeleteInterview(entry: InterviewEntry) {
+    if (!accessToken || !data || !sheetId) {
+      return
+    }
+    setError(null)
+    setSaving(true)
+    try {
+      const token = await ensureFreshToken()
+      await deleteLinkedRow({
+        spreadsheetId: sheetId,
+        accessToken: token,
+        sheetTitle: linkedTabNames(selectedYear).interviews,
+        sheetRow: entry.sheetRow,
+      })
+      setData((current) =>
+        current
+          ? { ...current, interviewEntries: shiftRowsAfterDelete(current.interviewEntries, entry.sheetRow) }
+          : current,
+      )
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not delete interview'
+      setError(message)
+      throw err instanceof Error ? err : new Error(message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDeleteScreening(entry: ScreeningEntry) {
+    if (!accessToken || !data || !sheetId) {
+      return
+    }
+    setError(null)
+    setSaving(true)
+    try {
+      const token = await ensureFreshToken()
+      await deleteLinkedRow({
+        spreadsheetId: sheetId,
+        accessToken: token,
+        sheetTitle: linkedTabNames(selectedYear).screening,
+        sheetRow: entry.sheetRow,
+      })
+      setData((current) =>
+        current
+          ? { ...current, screeningEntries: shiftRowsAfterDelete(current.screeningEntries, entry.sheetRow) }
+          : current,
+      )
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not delete screening'
+      setError(message)
+      throw err instanceof Error ? err : new Error(message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const linkedActions: LinkedActions = {
+    addOa: (input) => handleAddAssessment('OA', input),
+    addHireVue: (input) => handleAddAssessment('HireVue', input),
+    addInterview: handleAddInterview,
+    addScreening: handleAddScreening,
+    toggleOaComplete: (entry, complete) => handleToggleAssessmentComplete('OA', entry, complete),
+    toggleHireVueComplete: (entry, complete) => handleToggleAssessmentComplete('HireVue', entry, complete),
+    toggleInterviewComplete: handleToggleInterviewComplete,
+    deleteOa: (entry) => handleDeleteAssessment('OA', entry),
+    deleteHireVue: (entry) => handleDeleteAssessment('HireVue', entry),
+    deleteInterview: handleDeleteInterview,
+    deleteScreening: handleDeleteScreening,
   }
 
   async function handleSignOut() {
@@ -803,12 +1029,16 @@ export default function App() {
                 setView('applications')
                 window.scrollTo({ top: 0, behavior: 'smooth' })
               }}
+              onOpenInProgress={() => {
+                setView('inProgress')
+                window.scrollTo({ top: 0, behavior: 'smooth' })
+              }}
               onSaveStatusChanges={handleSaveStatusChanges}
               onAddApplication={handleAddApplication}
-              onUpdateOaComplete={handleUpdateOaComplete}
+              linkedActions={linkedActions}
             />
           </div>
-        ) : (
+        ) : view === 'applications' ? (
           <div className="flex flex-1 flex-col lg:min-h-0">
             <ApplicationsView
               key={applicationsViewKey}
@@ -821,7 +1051,17 @@ export default function App() {
               onSaveStatusChanges={handleSaveStatusChanges}
               onAddApplication={handleAddApplication}
               onDeleteApplication={handleDeleteApplication}
-              onUpdateOaComplete={handleUpdateOaComplete}
+              linkedData={data}
+              linkedActions={linkedActions}
+            />
+          </div>
+        ) : (
+          <div className="flex flex-1 flex-col lg:min-h-0">
+            <InProgressView
+              data={data}
+              saving={saving}
+              onSaveStatusChanges={handleSaveStatusChanges}
+              linkedActions={linkedActions}
             />
           </div>
         )}

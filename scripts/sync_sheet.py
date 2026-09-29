@@ -16,20 +16,15 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
 EXPECTED_HEADERS = ["Company", "Location", "Role", "Date Applied", "Status"]
 VALID_STATUSES = {
     "Applied",
-    "OA",
+    "Progressed",
     "Interview",
     "Offer",
     "Rejected",
-    "OA->Rejected",
-    "Interview->Rejected",
 }
-REJECTION_STATUSES = {"Rejected", "OA->Rejected", "Interview->Rejected"}
 
 
 def is_rejected_status(status: str) -> bool:
-    collapsed = status.strip().lower().replace("→", "->")
-    collapsed = "->".join(part.strip() for part in collapsed.split("->"))
-    return collapsed in {"rejected", "oa->rejected", "interview->rejected"}
+    return status.strip().lower() == "rejected"
 
 ROOT = Path(__file__).resolve().parent.parent
 OUTPUT_PATH = ROOT / "src" / "data" / "data.json"

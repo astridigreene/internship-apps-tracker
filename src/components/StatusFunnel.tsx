@@ -10,7 +10,7 @@ import {
   YAxis,
 } from 'recharts'
 import type { Application } from '../types'
-import { isRejectedStatus } from '../types'
+import { computeStats } from '../lib/sheet'
 import type { ApplicationsStatusFilter } from '../views/ApplicationsView'
 
 interface StatusFunnelProps {
@@ -19,7 +19,7 @@ interface StatusFunnelProps {
   onSelectStage?: (filter: ApplicationsStatusFilter) => void
 }
 
-const STAGES = ['OA', 'Interview', 'Offer', 'Rejected'] as const
+const STAGES = ['Progressed', 'Interview', 'Offer', 'Rejected'] as const
 
 type Stage = (typeof STAGES)[number]
 
@@ -28,21 +28,21 @@ function stageToFilter(stage: Stage): ApplicationsStatusFilter {
 }
 
 const STAGE_COLORS_LIGHT: Record<Stage, string> = {
-  OA: '#3b82f6',
+  Progressed: '#3b82f6',
   Interview: '#f97316',
   Offer: '#10b981',
   Rejected: '#f43f5e',
 }
 
 const STAGE_COLORS_DARK: Record<Stage, string> = {
-  OA: '#60a5fa',
+  Progressed: '#60a5fa',
   Interview: '#fb923c',
   Offer: '#34d399',
   Rejected: '#fb7185',
 }
 
 const STAGE_FOOTER: Record<Stage, string> = {
-  OA: 'bg-status-oa-bg text-status-oa-text',
+  Progressed: 'bg-status-oa-bg text-status-oa-text',
   Interview: 'bg-status-interview-bg text-status-interview-text',
   Offer: 'bg-status-offer-bg text-status-offer-text',
   Rejected: 'bg-status-rejected-bg text-status-rejected-text',
@@ -78,21 +78,12 @@ export function StatusFunnel({ applications, fill, onSelectStage }: StatusFunnel
   const dark = usePrefersDark()
   const stageColors = dark ? STAGE_COLORS_DARK : STAGE_COLORS_LIGHT
 
-  const current = {
-    OA: 0,
-    Interview: 0,
-    Offer: 0,
-    Rejected: 0,
-  }
-
-  for (const app of applications) {
-    if (isRejectedStatus(app.status)) {
-      current.Rejected += 1
-      continue
-    }
-    if (app.status in current) {
-      current[app.status as keyof typeof current] += 1
-    }
+  const stats = computeStats(applications)
+  const current: Record<Stage, number> = {
+    Progressed: stats.progressed,
+    Interview: stats.interviews,
+    Offer: stats.offers,
+    Rejected: stats.rejections,
   }
 
   const chartData = STAGES.map((stage) => ({
@@ -123,7 +114,7 @@ export function StatusFunnel({ applications, fill, onSelectStage }: StatusFunnel
           Pipeline
         </h2>
         <p className="hidden text-[10px] text-panel-sub/80 sm:block">
-          {onSelectStage ? 'Click a bar to filter' : 'Current status counts'}
+          {onSelectStage ? 'Click a bar to filter' : 'Stages reached (Rejected = current)'}
         </p>
       </div>
       <div
@@ -166,7 +157,8 @@ export function StatusFunnel({ applications, fill, onSelectStage }: StatusFunnel
               }}
               formatter={(value, _name, item) => {
                 const stage = String(item?.payload?.stage ?? '')
-                return [`${value as number} current`, stage]
+                const label = stage === 'Rejected' ? 'current' : 'reached'
+                return [`${value as number} ${label}`, stage]
               }}
             />
             <Bar

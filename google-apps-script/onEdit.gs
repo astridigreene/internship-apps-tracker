@@ -29,12 +29,10 @@ var REPO = 'REPO' // e.g. 'internship-apps-tracker'
 var REQUIRED_COLUMNS = ['Company', 'Location', 'Role', 'Date Applied', 'Status']
 var VALID_STATUSES = {
   Applied: true,
-  OA: true,
+  Progressed: true,
   Interview: true,
   Offer: true,
   Rejected: true,
-  'OA->Rejected': true,
-  'Interview->Rejected': true,
 }
 
 /**

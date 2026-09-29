@@ -2,18 +2,19 @@ import { useMemo, useState } from 'react'
 import type {
   Application,
   ApplicationStatus,
+  LinkedActions,
   NewApplicationInput,
-  OaComplete,
   TrackerData,
 } from '../types'
 import { KpiCard } from '../components/KpiCard'
 import { StatusFunnel } from '../components/StatusFunnel'
 import { RecentUpdates } from '../components/RecentUpdates'
-import { OaCard } from '../components/OaCard'
+import { ToDoCard } from '../components/ToDoCard'
+import { DueSoonBanner } from '../components/DueSoonBanner'
 import { AppsPerDayChart } from '../components/AppsPerDayChart'
 import { ApplicationDetailModal } from '../components/ApplicationDetailModal'
 import { NewApplicationModal } from '../components/NewApplicationModal'
-import { computeStats } from '../lib/sheet'
+import { computeStats, linkedEntriesForCompany, matchesCompany } from '../lib/sheet'
 import type { ApplicationsStatusFilter, StatusEditChange } from './ApplicationsView'
 
 interface DashboardViewProps {
@@ -21,9 +22,10 @@ interface DashboardViewProps {
   saving?: boolean
   adding?: boolean
   onOpenApplications: (filter: ApplicationsStatusFilter) => void
+  onOpenInProgress: () => void
   onSaveStatusChanges?: (changes: StatusEditChange[]) => Promise<void>
   onAddApplication?: (application: NewApplicationInput) => Promise<void>
-  onUpdateOaComplete?: (app: Application, oaComplete: OaComplete) => Promise<void>
+  linkedActions?: LinkedActions
 }
 
 function formatRate(rate: number): string {
@@ -48,9 +50,10 @@ export function DashboardView({
   saving,
   adding,
   onOpenApplications,
+  onOpenInProgress,
   onSaveStatusChanges,
   onAddApplication,
-  onUpdateOaComplete,
+  linkedActions,
 }: DashboardViewProps) {
   const stats = useMemo(() => computeStats(data.applications), [data.applications])
   const [detailApp, setDetailApp] = useState<Application | null>(null)
@@ -60,6 +63,15 @@ export function DashboardView({
     detailApp === null
       ? null
       : (data.applications.find((a) => a.sheetRow === detailApp.sheetRow) ?? detailApp)
+
+  const detailLinked = detailAppLive ? linkedEntriesForCompany(data, detailAppLive.company) : undefined
+
+  function openCompany(company: string) {
+    const app = data.applications.find((a) => matchesCompany(a.company, company))
+    if (app) {
+      setDetailApp(app)
+    }
+  }
 
   async function handleDetailStatusUpdate(app: Application, toStatus: ApplicationStatus) {
     if (!onSaveStatusChanges) {
@@ -88,7 +100,8 @@ export function DashboardView({
           }
         }}
         onUpdateStatus={onSaveStatusChanges ? handleDetailStatusUpdate : undefined}
-        onUpdateOaComplete={onUpdateOaComplete}
+        linked={detailLinked}
+        linkedActions={linkedActions}
       />
       <NewApplicationModal
         open={newOpen}
@@ -107,14 +120,32 @@ export function DashboardView({
         }}
       />
 
-      <div className="flex shrink-0 items-center justify-end">
+      <DueSoonBanner
+        oaEntries={data.oaEntries}
+        hireVueEntries={data.hireVueEntries}
+        onSelectCompany={openCompany}
+      />
+
+      <div className="flex shrink-0 items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={onOpenInProgress}
+          className="inline-flex h-11 flex-1 items-center justify-between gap-2 rounded-lg border border-app-brand/40 bg-app-brand/10 px-3.5 text-left hover:bg-app-brand/15 lg:h-9 lg:rounded lg:px-2.5"
+        >
+          <span className="text-[13px] font-bold text-app-brand-dark lg:text-[12px] dark:text-app-brand">
+            In Progress
+          </span>
+          <span className="text-[16px] font-bold tabular-nums text-app-brand-dark lg:text-[14px] dark:text-app-brand">
+            {stats.inProgress}
+          </span>
+        </button>
         <button
           type="button"
           onClick={() => setNewOpen(true)}
           disabled={!onAddApplication || busy}
           title="Add new application"
           aria-label="Add new application"
-          className="inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-lg bg-app-brand px-3 text-[13px] font-bold text-white hover:bg-app-brand-dark disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto lg:h-9 lg:rounded lg:px-2.5 lg:text-[12px] dark:text-teal-950"
+          className="inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-app-brand px-3 text-[13px] font-bold text-white hover:bg-app-brand-dark disabled:cursor-not-allowed disabled:opacity-40 lg:h-9 lg:rounded lg:px-2.5 lg:text-[12px] dark:text-teal-950"
         >
           <PlusIcon />
           New
@@ -134,10 +165,10 @@ export function DashboardView({
           className={kpiClass}
           compact
           tone="oa"
-          label="OA"
-          value={stats.oas}
-          rate={formatRate(stats.oaRate)}
-          onClick={() => onOpenApplications('OA')}
+          label="Progressed"
+          value={stats.progressed}
+          rate={formatRate(stats.progressedRate)}
+          onClick={() => onOpenApplications('Progressed')}
         />
         <KpiCard
           className={kpiClass}
@@ -170,10 +201,13 @@ export function DashboardView({
 
       <div className="flex shrink-0 flex-col gap-3 lg:grid lg:h-[min(280px,38vh)] lg:grid-cols-12 lg:gap-2">
         <div className="lg:col-span-4 lg:min-h-0">
-          <OaCard
+          <ToDoCard
+            oaEntries={data.oaEntries}
+            hireVueEntries={data.hireVueEntries}
             applications={data.applications}
-            onOpenAll={() => onOpenApplications('OA')}
-            onSelectApplication={setDetailApp}
+            onOpenAll={onOpenInProgress}
+            onSelectCompany={openCompany}
+            onApplyClick={() => setNewOpen(true)}
           />
         </div>
         <div className="lg:col-span-5 lg:min-h-0">

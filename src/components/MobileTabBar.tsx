@@ -5,12 +5,13 @@ interface MobileTabBarProps {
   onNavigate: (view: ViewId) => void
 }
 
-const TABS: { id: ViewId; label: string; icon: 'home' | 'list' }[] = [
+const TABS: { id: ViewId; label: string; icon: 'home' | 'list' | 'progress' }[] = [
   { id: 'dashboard', label: 'Home', icon: 'home' },
   { id: 'applications', label: 'Apps', icon: 'list' },
+  { id: 'inProgress', label: 'Progress', icon: 'progress' },
 ]
 
-function TabIcon({ icon, active }: { icon: 'home' | 'list'; active: boolean }) {
+function TabIcon({ icon, active }: { icon: 'home' | 'list' | 'progress'; active: boolean }) {
   const stroke = active ? 'currentColor' : 'currentColor'
   if (icon === 'home') {
     return (
@@ -19,6 +20,19 @@ function TabIcon({ icon, active }: { icon: 'home' | 'list'; active: boolean }) {
           d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z"
           stroke={stroke}
           strokeWidth="2"
+          strokeLinejoin="round"
+        />
+      </svg>
+    )
+  }
+  if (icon === 'progress') {
+    return (
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden>
+        <path
+          d="M4 20V13M12 20V6M20 20V10"
+          stroke={stroke}
+          strokeWidth="2"
+          strokeLinecap="round"
           strokeLinejoin="round"
         />
       </svg>
@@ -43,7 +57,7 @@ export function MobileTabBar({ active, onNavigate }: MobileTabBarProps) {
       style={{ paddingBottom: 'max(0.35rem, env(safe-area-inset-bottom))' }}
       aria-label="Primary"
     >
-      <div className="grid grid-cols-2 gap-1 px-2 pt-1">
+      <div className="grid grid-cols-3 gap-1 px-2 pt-1">
         {TABS.map((tab) => {
           const isActive = active === tab.id
           return (

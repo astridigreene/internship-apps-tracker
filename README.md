@@ -17,14 +17,16 @@ Your application rows stay in **your** Google Sheet. The site does not store you
 - **Your own spreadsheet** — paste a Sheet URL once; the ID is remembered in this browser for your Google account
 - **Year tabs** — tabs named like `2027`, `2026`
 - **Dashboard**
-  - KPI counts (Applied, OA, Interview, Offer, Rejected) with click-through filters
-  - OA card: incomplete OAs only (`Status = OA` and `OA Complete = N`), with days since last update
+  - KPI counts (Applied, Progressed, Interview, Offer, Rejected) with click-through filters — Progressed/Interview/Offer are cumulative (furthest stage ever reached), so a rejection after an OA still counts as Progressed
+  - **In Progress** count banner — applications currently Progressed or in Interview, links to the In Progress tab
+  - Pending OA/HireVue card — entries with `Complete = No`, sorted by soonest `Deadline`
   - Pipeline chart
   - Recent list sorted by **Last Updated** (click a row for details)
 - **Applications table**
-  - Search + clear status filter chips (Active, All, Applied, OA, …)
-  - Row click → detail popup (edit status, advance round, mark rejected, set OA Complete when status is OA)
+  - Search + clear status filter chips (Active, All, Applied, Progressed, …)
+  - Row click → detail popup (edit status, advance round, mark rejected, log/complete linked OA·HireVue·Screening·Interview entries)
   - New application, bulk status edit + save, delete row
+- **In Progress tab** — every application currently Progressed or Interview, with its linked OA/HireVue deadlines, screenings, and interview date/times inline
 - **Sheet setup help** — if headers/tabs are wrong, the app shows which columns to add instead of failing silently
 - **Dark mode** follows system preference
 
@@ -33,12 +35,29 @@ Your application rows stay in **your** Google Sheet. The site does not store you
 | Required | Optional |
 | --- | --- |
 | Company | Last Updated — stamped when status changes |
-| Location | OA Complete — `N/A`, `N`, or `Y` (incomplete OAs show on the OA card) |
+| Location | Highest Stage — auto-stamped, furthest stage reached (survives a later rejection) |
 | Role | |
 | Date Applied | |
 | Status | |
 
-**Status values:** `Applied`, `OA`, `Interview`, `Offer`, `Rejected`, `OA->Rejected`, `Interview->Rejected`
+**Status values:** `Applied`, `Progressed`, `Interview`, `Offer`, `Rejected`
+
+### Sibling tabs per year (optional, auto-created)
+
+Alongside a year tab (e.g. `2027`), the app can read/write four optional sibling
+tabs for the detail behind a `Progressed`/`Interview` status. They're created
+automatically the first time you log an entry from the app — you don't have to
+make them by hand:
+
+| Tab | Columns |
+| --- | --- |
+| `2027 OA` | Deadline, Auto, Company, Date Offered, Length (minutes), Site, Complete |
+| `2027 HireVue` | same as OA |
+| `2027 Interviews` | Company, Date & Time, Notes, Complete |
+| `2027 Screening` | Company, Date & Time, Notes |
+
+A company can have several OA/HireVue/Interview rows at once — they link back to
+an application by matching Company name (case-insensitive) within the same year.
 
 The template already includes these headers (and sample year tabs). Use **Make a copy** rather than editing the template itself if you do not own it.
 
@@ -125,21 +144,6 @@ Optional Script properties: `REMINDER_EMAIL`, `REMINDER_YEAR` (e.g. `2027`).
 
 ---
 
-## Optional: Gmail → status auto-update (~every 5 min)
-
-Example file: `google-apps-script/emailStatusSync.example.gs`  
-(Your personal copy `emailStatusSync.gs` is gitignored.)
-
-Polls Gmail for **unread** inbox mail, matches **Company** names on your active year tab, and auto-advances **Status** from subject/body heuristics (OA / Interview / Offer / stage-aware Rejected). Only moves **forward** (or clear rejections). When it updates at least one row, it calls **`_dispatchGithubEvent_`** from your existing `onEdit.gs` for the empty contribution commit. There is no true Apps Script “on new email” hook—this uses a 5-minute trigger instead.
-
-1. Spreadsheet → **Extensions → Apps Script** → paste `emailStatusSync.example.gs` into the **same project** as your existing ping script (`onEdit.gs`).
-2. Run **`createEmailStatusSyncTrigger`** once (authorize Gmail + Sheets).
-3. Optional test: run **`syncStatusesFromEmail`**.
-
-Optional Script properties: `SYNC_YEAR` (or `REMINDER_YEAR`), `GMAIL_QUERY`, `MAX_UPDATES`.
-
----
-
 ## Privacy & security checklist
 
 - No application rows or personal emails are committed to this repo (`data.json` is an empty stub if present).
@@ -161,7 +165,7 @@ Optional Script properties: `SYNC_YEAR` (or `REMINDER_YEAR`), `GMAIL_QUERY`, `MA
 
 ## Optional extras
 
-- **`google-apps-script/`** — optional Sheet helpers (daily reminder email, Gmail status sync, Last Updated stamp). Do not put tokens in git.
+- **`google-apps-script/`** — optional Sheet helpers (daily reminder email, Last Updated stamp). Do not put tokens in git.
 - **`scripts/sync_sheet.py`** — optional offline export via a service account. Keep service-account JSON **outside** the repo; avoid using this on a public tracker.
 
 ---

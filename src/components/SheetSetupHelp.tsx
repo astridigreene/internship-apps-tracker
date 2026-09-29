@@ -1,4 +1,5 @@
 import {
+  LINKED_TAB_GUIDE,
   OPTIONAL_COLUMN_GUIDE,
   REQUIRED_COLUMN_GUIDE,
   type SheetSetupError,
@@ -119,6 +120,27 @@ export function SheetSetupHelp({
                 </p>
                 <p className="mt-1 text-[12px] font-semibold text-app-text">
                   {found.length ? found.join(' · ') : '(none)'}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-[11px] font-bold tracking-[0.06em] uppercase text-app-text-weak">
+                  Optional sibling tabs (e.g. {yearTab ? `"${yearTab} OA"` : '"2027 OA"'})
+                </p>
+                <ul className="mt-1.5 space-y-1.5">
+                  {LINKED_TAB_GUIDE.map((tab) => (
+                    <li
+                      key={tab.label}
+                      className="rounded border border-app-border bg-app-muted px-2.5 py-1.5 text-[12px] text-app-text"
+                    >
+                      <span className="font-bold">{tab.label}</span>
+                      <span className="mt-0.5 block font-medium text-app-text-weak">{tab.hint}</span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-1.5 text-[11px] font-medium text-app-text-weak">
+                  These are created automatically the first time you add an entry from the app —
+                  you don't have to make them by hand.
                 </p>
               </div>
             </>
