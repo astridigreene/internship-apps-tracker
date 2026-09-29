@@ -51,7 +51,7 @@ make them by hand:
 
 | Tab | Columns |
 | --- | --- |
-| `2027 OA` | Deadline, Auto, Company, Date Offered, Length (minutes), Site, Complete |
+| `2027 OA` | Deadline (date & time), Auto, Company, Date Offered, Length (minutes), Site, Complete |
 | `2027 HireVue` | same as OA |
 | `2027 Interviews` | Company, Date & Time, Notes, Complete |
 | `2027 Screening` | Company, Date & Time, Notes |

@@ -42,24 +42,19 @@ export function formatDueInDays(deadline: Date | null, now = new Date()): string
 }
 
 /**
- * True when `deadline` falls within the next 24 hours (through end of its day),
- * and hasn't already passed. A deadline dated today is always "due soon" —
- * deadlines only carry a date, not a time, so we treat the due moment as the
- * end of that day rather than midnight.
+ * True when `deadline` falls within the next 24 hours and hasn't already passed.
+ * Deadlines carry a real time now — if one was set, it's used exactly. A deadline
+ * that parsed to exactly midnight (no time ever specified, e.g. typed in by hand
+ * as a bare date) is treated as due by the end of that day instead.
  */
 export function isDueSoon(deadline: Date | null, now = new Date()): boolean {
   if (!deadline || Number.isNaN(deadline.getTime())) {
     return false
   }
-  const dueMoment = new Date(
-    deadline.getFullYear(),
-    deadline.getMonth(),
-    deadline.getDate(),
-    23,
-    59,
-    59,
-    999,
-  )
+  const hasTime = deadline.getHours() !== 0 || deadline.getMinutes() !== 0 || deadline.getSeconds() !== 0
+  const dueMoment = hasTime
+    ? deadline
+    : new Date(deadline.getFullYear(), deadline.getMonth(), deadline.getDate(), 23, 59, 59, 999)
   const diffMs = dueMoment.getTime() - now.getTime()
   return diffMs >= 0 && diffMs <= 24 * 60 * 60 * 1000
 }
@@ -105,10 +100,13 @@ export function parseSheetDate(value: string): Date | null {
     return Number.isNaN(date.getTime()) ? null : date
   }
 
-  // HTML date inputs / ISO date-only (avoid UTC day-shift)
-  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s].*)?$/)
+  // HTML date / datetime-local inputs, ISO date(-time) (avoid UTC day-shift)
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2})(?::(\d{2}))?)?/)
   if (iso) {
-    const date = new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]))
+    const hours = iso[4] !== undefined ? Number(iso[4]) : 0
+    const minutes = iso[5] !== undefined ? Number(iso[5]) : 0
+    const seconds = iso[6] !== undefined ? Number(iso[6]) : 0
+    const date = new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]), hours, minutes, seconds)
     return Number.isNaN(date.getTime()) ? null : date
   }
 
@@ -126,6 +124,26 @@ export function formatDisplayDate(value: string | Date | null | undefined): stri
     return String(value).trim()
   }
   return `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`
+}
+
+/** Display a date, plus a time-of-day if one is actually set (e.g. "10/5/2026, 2:30 PM"). */
+export function formatDisplayDateTime(value: string | Date | null | undefined): string {
+  if (value == null || value === '') {
+    return ''
+  }
+  const date = value instanceof Date ? value : parseSheetDate(String(value))
+  if (!date) {
+    return String(value).trim()
+  }
+  const datePart = `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`
+  if (date.getHours() === 0 && date.getMinutes() === 0 && date.getSeconds() === 0) {
+    return datePart
+  }
+  const hours24 = date.getHours()
+  const hours12 = hours24 % 12 === 0 ? 12 : hours24 % 12
+  const ampm = hours24 < 12 ? 'AM' : 'PM'
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${datePart}, ${hours12}:${minutes} ${ampm}`
 }
 
 /** Stamp written into the Last Updated column (M/D/YYYY). */

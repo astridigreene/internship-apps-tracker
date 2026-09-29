@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import type { AssessmentEntry, NewAssessmentInput } from '../types'
-import { formatDisplayDate } from '../lib/time'
+import { formatDisplayDateTime } from '../lib/time'
 
 interface AssessmentPanelProps {
   kind: 'OA' | 'HireVue'
@@ -100,10 +100,10 @@ export function AssessmentPanel({
             />
           ) : null}
           <div className="grid grid-cols-2 gap-1.5">
-            <label className="text-[10px] font-bold uppercase text-app-text-weak">
-              Deadline
+            <label className="col-span-2 text-[10px] font-bold uppercase text-app-text-weak">
+              Deadline (date &amp; time)
               <input
-                type="date"
+                type="datetime-local"
                 required
                 value={form.deadline}
                 onChange={(e) => setForm((f) => ({ ...f, deadline: e.target.value }))}
@@ -165,7 +165,7 @@ export function AssessmentPanel({
             <li key={entry.sheetRow} className="flex items-center gap-2 px-2.5 py-2">
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[12px] font-bold text-app-text">
-                  {formatDisplayDate(entry.deadline) || entry.deadline || 'No deadline'}
+                  {formatDisplayDateTime(entry.deadline) || entry.deadline || 'No deadline'}
                   {entry.auto ? <span className="ml-1 font-normal text-app-text-weak">· Auto</span> : null}
                 </p>
                 <p className="truncate text-[11px] text-app-text-weak">

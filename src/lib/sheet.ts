@@ -52,7 +52,7 @@ export const OPTIONAL_COLUMN_GUIDE = [
 export const LINKED_TAB_GUIDE = [
   {
     label: 'OA',
-    hint: 'Columns: Deadline, Auto, Company, Date Offered, Length (minutes), Site, Complete',
+    hint: 'Columns: Deadline (date & time), Auto, Company, Date Offered, Length (minutes), Site, Complete',
   },
   {
     label: 'HireVue',
@@ -479,7 +479,7 @@ function parseAssessmentSheet(
     entries.push({
       kind,
       company: companyVal,
-      deadline: formatDisplayDate(deadlineVal) || deadlineVal,
+      deadline: deadlineVal,
       auto: normalizeYesNo(cellAt(row, columns.auto)),
       dateOffered: formatDisplayDate(cellAt(row, columns.dateOffered)) || cellAt(row, columns.dateOffered),
       lengthMinutes: cellAt(row, columns.lengthMinutes),
@@ -1175,7 +1175,7 @@ export async function appendAssessmentEntry(options: {
   }
 
   const row = [
-    formatDisplayDate(options.input.deadline) || options.input.deadline,
+    options.input.deadline,
     formatYesNo(options.input.auto),
     options.input.company,
     formatDisplayDate(options.input.dateOffered) || options.input.dateOffered,
