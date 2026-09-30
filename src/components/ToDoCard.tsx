@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import type { Application, AssessmentEntry } from '../types'
-import { formatDueInDays, isSameDay, parseSheetDate } from '../lib/time'
+import { formatDueInDays, isExpired, isSameDay, parseSheetDate } from '../lib/time'
 import { matchesCompany } from '../lib/sheet'
 
 const DAILY_APPLY_GOAL = 3
@@ -24,7 +24,7 @@ export function ToDoCard({
 }: ToDoCardProps) {
   const pending = useMemo(() => {
     return [...oaEntries, ...hireVueEntries]
-      .filter((entry) => !entry.complete)
+      .filter((entry) => !entry.complete && !isExpired(parseSheetDate(entry.deadline)))
       .sort((a, b) => {
         const aTime = parseSheetDate(a.deadline)?.getTime() ?? Number.POSITIVE_INFINITY
         const bTime = parseSheetDate(b.deadline)?.getTime() ?? Number.POSITIVE_INFINITY
