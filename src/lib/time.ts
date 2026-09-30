@@ -158,6 +158,31 @@ export function formatDisplayDateTime(value: string | Date | null | undefined): 
   return `${datePart}, ${hours12}:${minutes} ${ampm}`
 }
 
+/**
+ * Deadline (or any date/time) formatted the way Google Sheets reliably recognizes
+ * as a real date-time value on write (`M/D/YYYY h:mm AM/PM`), not literal text.
+ * Falls back to the raw input when it doesn't parse, and to a date-only stamp
+ * when there's no time-of-day set.
+ */
+export function formatSheetDateTime(value: string | Date | null | undefined): string {
+  if (value == null || value === '') {
+    return ''
+  }
+  const date = value instanceof Date ? value : parseSheetDate(String(value))
+  if (!date) {
+    return String(value).trim()
+  }
+  const datePart = `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`
+  if (date.getHours() === 0 && date.getMinutes() === 0 && date.getSeconds() === 0) {
+    return datePart
+  }
+  const hours24 = date.getHours()
+  const hours12 = hours24 % 12 === 0 ? 12 : hours24 % 12
+  const ampm = hours24 < 12 ? 'AM' : 'PM'
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${datePart} ${hours12}:${minutes} ${ampm}`
+}
+
 /** Stamp written into the Last Updated column (M/D/YYYY). */
 export function statusUpdateStamp(now = new Date()): string {
   return formatDisplayDate(now)

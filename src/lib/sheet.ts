@@ -25,7 +25,7 @@ import {
   type Stats,
   type TrackerData,
 } from '../types'
-import { formatDisplayDate } from './time'
+import { formatDisplayDate, formatSheetDateTime } from './time'
 
 /** Required header labels shown in setup help. */
 export const REQUIRED_COLUMN_GUIDE = [
@@ -1175,7 +1175,7 @@ export async function appendAssessmentEntry(options: {
   }
 
   const row = [
-    options.input.deadline,
+    formatSheetDateTime(options.input.deadline) || options.input.deadline,
     formatYesNo(options.input.auto),
     options.input.company,
     formatDisplayDate(options.input.dateOffered) || options.input.dateOffered,
