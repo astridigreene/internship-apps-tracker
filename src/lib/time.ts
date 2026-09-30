@@ -42,21 +42,33 @@ export function formatDueInDays(deadline: Date | null, now = new Date()): string
 }
 
 /**
- * True when `deadline` falls within the next 24 hours and hasn't already passed.
- * Deadlines carry a real time now — if one was set, it's used exactly. A deadline
- * that parsed to exactly midnight (no time ever specified, e.g. typed in by hand
- * as a bare date) is treated as due by the end of that day instead.
+ * The actual due moment for a deadline. Deadlines carry a real time now — if one
+ * was set, it's used exactly. A deadline that parsed to exactly midnight (no time
+ * ever specified, e.g. typed in by hand as a bare date) is treated as due by the
+ * end of that day instead.
  */
+function dueMoment(deadline: Date): Date {
+  const hasTime = deadline.getHours() !== 0 || deadline.getMinutes() !== 0 || deadline.getSeconds() !== 0
+  return hasTime
+    ? deadline
+    : new Date(deadline.getFullYear(), deadline.getMonth(), deadline.getDate(), 23, 59, 59, 999)
+}
+
+/** True when `deadline` falls within the next 24 hours and hasn't already passed. */
 export function isDueSoon(deadline: Date | null, now = new Date()): boolean {
   if (!deadline || Number.isNaN(deadline.getTime())) {
     return false
   }
-  const hasTime = deadline.getHours() !== 0 || deadline.getMinutes() !== 0 || deadline.getSeconds() !== 0
-  const dueMoment = hasTime
-    ? deadline
-    : new Date(deadline.getFullYear(), deadline.getMonth(), deadline.getDate(), 23, 59, 59, 999)
-  const diffMs = dueMoment.getTime() - now.getTime()
+  const diffMs = dueMoment(deadline).getTime() - now.getTime()
   return diffMs >= 0 && diffMs <= 24 * 60 * 60 * 1000
+}
+
+/** True when `deadline` has already passed. */
+export function isExpired(deadline: Date | null, now = new Date()): boolean {
+  if (!deadline || Number.isNaN(deadline.getTime())) {
+    return false
+  }
+  return dueMoment(deadline).getTime() < now.getTime()
 }
 
 /** True when two dates fall on the same local calendar day. */

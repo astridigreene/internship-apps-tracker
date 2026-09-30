@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import type { AssessmentEntry, NewAssessmentInput } from '../types'
-import { formatDisplayDateTime } from '../lib/time'
+import { formatDisplayDateTime, isExpired, parseSheetDate } from '../lib/time'
 
 interface AssessmentPanelProps {
   kind: 'OA' | 'HireVue'
@@ -161,47 +161,55 @@ export function AssessmentPanel({
         <p className="px-2.5 py-2.5 text-[12px] text-app-text-weak">No {kind} entries yet.</p>
       ) : (
         <ul className="divide-y divide-app-border">
-          {sorted.map((entry) => (
-            <li key={entry.sheetRow} className="flex items-center gap-2 px-2.5 py-2">
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[12px] font-bold text-app-text">
-                  {formatDisplayDateTime(entry.deadline) || entry.deadline || 'No deadline'}
-                  {entry.auto ? <span className="ml-1 font-normal text-app-text-weak">· Auto</span> : null}
-                </p>
-                <p className="truncate text-[11px] text-app-text-weak">
-                  {[entry.site, entry.lengthMinutes ? `${entry.lengthMinutes} min` : '']
-                    .filter(Boolean)
-                    .join(' · ') || '—'}
-                </p>
-              </div>
-              {onToggleComplete ? (
-                <button
-                  type="button"
-                  disabled={disabled}
-                  onClick={() => void onToggleComplete(entry, !entry.complete)}
-                  className={[
-                    'shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold',
-                    entry.complete
-                      ? 'bg-kpi-offer-bg text-kpi-offer-text'
-                      : 'bg-kpi-oa-bg text-kpi-oa-text',
-                  ].join(' ')}
-                >
-                  {entry.complete ? 'Complete' : 'Pending'}
-                </button>
-              ) : null}
-              {onDelete ? (
-                <button
-                  type="button"
-                  disabled={disabled}
-                  onClick={() => void onDelete(entry)}
-                  aria-label={`Delete ${kind} entry`}
-                  className="shrink-0 text-[11px] font-bold text-rose-600 hover:underline disabled:opacity-50 dark:text-rose-400"
-                >
-                  Delete
-                </button>
-              ) : null}
-            </li>
-          ))}
+          {sorted.map((entry) => {
+            const expired = !entry.complete && isExpired(parseSheetDate(entry.deadline))
+            return (
+              <li key={entry.sheetRow} className="flex items-center gap-2 px-2.5 py-2">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[12px] font-bold text-app-text">
+                    {formatDisplayDateTime(entry.deadline) || entry.deadline || 'No deadline'}
+                    {entry.auto ? (
+                      <span className="ml-1 font-normal text-app-text-weak">· Auto</span>
+                    ) : null}
+                  </p>
+                  <p className="truncate text-[11px] text-app-text-weak">
+                    {[entry.site, entry.lengthMinutes ? `${entry.lengthMinutes} min` : '']
+                      .filter(Boolean)
+                      .join(' · ') || '—'}
+                  </p>
+                </div>
+                {onToggleComplete ? (
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => void onToggleComplete(entry, !entry.complete)}
+                    title={expired ? 'Past its deadline — click to mark complete' : undefined}
+                    className={[
+                      'shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold',
+                      entry.complete
+                        ? 'bg-kpi-offer-bg text-kpi-offer-text'
+                        : expired
+                          ? 'bg-kpi-reject-bg text-kpi-reject-text'
+                          : 'bg-kpi-oa-bg text-kpi-oa-text',
+                    ].join(' ')}
+                  >
+                    {entry.complete ? 'Complete' : expired ? 'Expired' : 'Pending'}
+                  </button>
+                ) : null}
+                {onDelete ? (
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => void onDelete(entry)}
+                    aria-label={`Delete ${kind} entry`}
+                    className="shrink-0 text-[11px] font-bold text-rose-600 hover:underline disabled:opacity-50 dark:text-rose-400"
+                  >
+                    Delete
+                  </button>
+                ) : null}
+              </li>
+            )
+          })}
         </ul>
       )}
     </div>
