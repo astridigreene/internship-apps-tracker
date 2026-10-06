@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import type { Application, ApplicationStatus, LinkedActions, TrackerData } from '../types'
 import { StatusPill } from '../components/StatusPill'
 import { ApplicationDetailModal } from '../components/ApplicationDetailModal'
-import { linkedEntriesForCompany } from '../lib/sheet'
+import { linkedEntriesForApplication } from '../lib/sheet'
 import { formatDueInDays, parseSheetDate } from '../lib/time'
 import type { StatusEditChange } from './ApplicationsView'
 
@@ -13,7 +13,7 @@ interface InProgressViewProps {
   linkedActions?: LinkedActions
 }
 
-function nextPendingLabel(linked: ReturnType<typeof linkedEntriesForCompany>): string | null {
+function nextPendingLabel(linked: ReturnType<typeof linkedEntriesForApplication>): string | null {
   const pendingAssessments = [...linked.oa, ...linked.hireVue].filter((e) => !e.complete)
   if (pendingAssessments.length > 0) {
     const soonest = pendingAssessments
@@ -51,7 +51,7 @@ export function InProgressView({ data, saving, onSaveStatusChanges, linkedAction
     detailApp === null
       ? null
       : (data.applications.find((a) => a.sheetRow === detailApp.sheetRow) ?? detailApp)
-  const detailLinked = detailAppLive ? linkedEntriesForCompany(data, detailAppLive.company) : undefined
+  const detailLinked = detailAppLive ? linkedEntriesForApplication(data, detailAppLive, data.applications) : undefined
 
   async function handleDetailStatusUpdate(app: Application, toStatus: ApplicationStatus) {
     if (!onSaveStatusChanges) {
@@ -90,7 +90,7 @@ export function InProgressView({ data, saving, onSaveStatusChanges, linkedAction
         ) : (
           <ul className="divide-y divide-app-border">
             {inProgress.map((app) => {
-              const linked = linkedEntriesForCompany(data, app.company)
+              const linked = linkedEntriesForApplication(data, app, data.applications)
               const pendingLabel = nextPendingLabel(linked)
               return (
                 <li key={app.sheetRow}>

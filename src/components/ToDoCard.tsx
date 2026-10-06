@@ -1,39 +1,66 @@
 import { useMemo } from 'react'
-import type { Application, AssessmentEntry } from '../types'
+import type { Application, AssessmentEntry, InterviewEntry } from '../types'
 import { formatDueInDays, isExpired, isSameDay, parseSheetDate } from '../lib/time'
-import { matchesCompany } from '../lib/sheet'
+import { linkedApplicationFor } from '../lib/sheet'
 
 const DAILY_APPLY_GOAL = 3
+
+interface PendingItem {
+  key: string
+  kind: 'OA' | 'HireVue' | 'Interview'
+  company: string
+  /** Raw sheet value: the OA/HireVue deadline or the interview date/time. */
+  when: string
+  app: Application | undefined
+}
 
 interface ToDoCardProps {
   oaEntries: AssessmentEntry[]
   hireVueEntries: AssessmentEntry[]
+  interviewEntries: InterviewEntry[]
   applications: Application[]
   onOpenAll?: () => void
-  onSelectCompany?: (company: string) => void
+  onSelectApplication?: (app: Application) => void
   onApplyClick?: () => void
 }
 
 export function ToDoCard({
   oaEntries,
   hireVueEntries,
+  interviewEntries,
   applications,
   onOpenAll,
-  onSelectCompany,
+  onSelectApplication,
   onApplyClick,
 }: ToDoCardProps) {
   const pending = useMemo(() => {
-    return [...oaEntries, ...hireVueEntries]
+    const assessments: PendingItem[] = [...oaEntries, ...hireVueEntries]
       .filter((entry) => !entry.complete && !isExpired(parseSheetDate(entry.deadline)))
-      .sort((a, b) => {
-        const aTime = parseSheetDate(a.deadline)?.getTime() ?? Number.POSITIVE_INFINITY
-        const bTime = parseSheetDate(b.deadline)?.getTime() ?? Number.POSITIVE_INFINITY
-        if (aTime === bTime) {
-          return a.company.localeCompare(b.company)
-        }
-        return aTime - bTime
-      })
-  }, [oaEntries, hireVueEntries])
+      .map((entry) => ({
+        key: `${entry.kind}-${entry.sheetRow}`,
+        kind: entry.kind,
+        company: entry.company,
+        when: entry.deadline,
+        app: linkedApplicationFor(entry, applications, 'Progressed'),
+      }))
+    const interviews: PendingItem[] = interviewEntries
+      .filter((entry) => !entry.complete && !isExpired(parseSheetDate(entry.dateTime)))
+      .map((entry) => ({
+        key: `Interview-${entry.sheetRow}`,
+        kind: 'Interview',
+        company: entry.company,
+        when: entry.dateTime,
+        app: linkedApplicationFor(entry, applications, 'Interview'),
+      }))
+    return [...assessments, ...interviews].sort((a, b) => {
+      const aTime = parseSheetDate(a.when)?.getTime() ?? Number.POSITIVE_INFINITY
+      const bTime = parseSheetDate(b.when)?.getTime() ?? Number.POSITIVE_INFINITY
+      if (aTime === bTime) {
+        return a.company.localeCompare(b.company)
+      }
+      return aTime - bTime
+    })
+  }, [oaEntries, hireVueEntries, interviewEntries, applications])
 
   const appliedToday = useMemo(() => {
     const today = new Date()
@@ -45,10 +72,6 @@ export function ToDoCard({
 
   const remainingApplies = Math.max(0, DAILY_APPLY_GOAL - appliedToday)
   const totalCount = (remainingApplies > 0 ? 1 : 0) + pending.length
-
-  function roleFor(company: string): string {
-    return applications.find((app) => matchesCompany(app.company, company))?.role ?? ''
-  }
 
   return (
     <div className="flex flex-col overflow-hidden rounded-md border border-kpi-oa-border bg-kpi-oa-bg lg:h-full lg:min-h-0">
@@ -95,16 +118,19 @@ export function ToDoCard({
             </li>
           ) : null}
           {pending.map((entry) => {
-            const deadline = parseSheetDate(entry.deadline)
-            const dueLabel = formatDueInDays(deadline)
-            const interactive = Boolean(onSelectCompany)
-            const role = roleFor(entry.company)
+            const deadline = parseSheetDate(entry.when)
+            const dueLabel =
+              entry.kind === 'Interview'
+                ? formatDueInDays(deadline).replace(/^due /, '')
+                : formatDueInDays(deadline)
+            const interactive = Boolean(onSelectApplication && entry.app)
+            const role = entry.app?.role ?? ''
             return (
-              <li key={`${entry.kind}-${entry.sheetRow}`} className="last:border-b-0">
+              <li key={entry.key} className="last:border-b-0">
                 <button
                   type="button"
                   disabled={!interactive}
-                  onClick={() => onSelectCompany?.(entry.company)}
+                  onClick={() => entry.app && onSelectApplication?.(entry.app)}
                   className={[
                     'flex w-full items-center justify-between gap-2 border-b border-kpi-oa-border/40 px-3 py-3 text-left lg:px-2.5 lg:py-1.5',
                     interactive
@@ -122,7 +148,7 @@ export function ToDoCard({
                       'shrink-0 text-[12px] font-semibold tabular-nums lg:text-[11px]',
                       deadline ? 'text-kpi-oa-text' : 'text-app-text-weak',
                     ].join(' ')}
-                    title={entry.deadline || undefined}
+                    title={entry.when || undefined}
                   >
                     {dueLabel}
                   </p>

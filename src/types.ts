@@ -211,6 +211,8 @@ export interface AssessmentEntry {
   lengthMinutes: string
   site: string
   complete: boolean
+  /** Row of the application this belongs to on the year tab (App Row column), if recorded. */
+  appRow: number | null
   sheetRow: number
 }
 
@@ -221,6 +223,8 @@ export interface NewAssessmentInput {
   dateOffered: string
   lengthMinutes: string
   site: string
+  /** Year-tab row of the application this belongs to. */
+  appRow?: number
 }
 
 /** A linked interview entry (`<year> Interviews` tab). */
@@ -229,6 +233,8 @@ export interface InterviewEntry {
   dateTime: string
   notes: string
   complete: boolean
+  /** Row of the application this belongs to on the year tab (App Row column), if recorded. */
+  appRow: number | null
   sheetRow: number
 }
 
@@ -236,6 +242,8 @@ export interface NewInterviewInput {
   company: string
   dateTime: string
   notes: string
+  /** Year-tab row of the application this belongs to. */
+  appRow?: number
 }
 
 /** A linked recruiter screening entry (`<year> Screening` tab). No Complete field. */
@@ -243,6 +251,8 @@ export interface ScreeningEntry {
   company: string
   dateTime: string
   notes: string
+  /** Row of the application this belongs to on the year tab (App Row column), if recorded. */
+  appRow: number | null
   sheetRow: number
 }
 
@@ -250,6 +260,8 @@ export interface NewScreeningInput {
   company: string
   dateTime: string
   notes: string
+  /** Year-tab row of the application this belongs to. */
+  appRow?: number
 }
 
 /** Column layout for the OA/HireVue tabs (identical shape). */
@@ -261,6 +273,7 @@ export interface AssessmentSheetColumns {
   lengthMinutes: number | null
   site: number | null
   complete: number | null
+  appRow: number | null
 }
 
 /** Column layout for the Interviews tab. */
@@ -269,6 +282,7 @@ export interface InterviewSheetColumns {
   dateTime: number
   notes: number | null
   complete: number | null
+  appRow: number | null
 }
 
 /** Column layout for the Screening tab. */
@@ -276,6 +290,7 @@ export interface ScreeningSheetColumns {
   company: number
   dateTime: number
   notes: number | null
+  appRow: number | null
 }
 
 /** One of the four optional linked tabs for a year — present/absent tracked separately. */

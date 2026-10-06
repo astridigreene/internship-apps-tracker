@@ -16,7 +16,7 @@ import { DeleteConfirmModal } from '../components/DeleteConfirmModal'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { ApplicationDetailModal } from '../components/ApplicationDetailModal'
 import { formatDisplayDate } from '../lib/time'
-import { linkedEntriesForCompany } from '../lib/sheet'
+import { linkedEntriesForApplication } from '../lib/sheet'
 
 type SortKey = 'company' | 'location' | 'role' | 'dateApplied' | 'status'
 type SortDir = 'asc' | 'desc'
@@ -326,7 +326,7 @@ export function ApplicationsView({
       ? null
       : (applications.find((a) => a.sheetRow === detailApp.sheetRow) ?? detailApp)
   const detailLinked =
-    detailAppLive && linkedData ? linkedEntriesForCompany(linkedData, detailAppLive.company) : undefined
+    detailAppLive && linkedData ? linkedEntriesForApplication(linkedData, detailAppLive, applications) : undefined
 
   return (
     <div className="flex w-full flex-col gap-3 lg:h-full lg:min-h-0 lg:gap-2.5">

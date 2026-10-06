@@ -51,13 +51,18 @@ make them by hand:
 
 | Tab | Columns |
 | --- | --- |
-| `2027 OA` | Deadline (date & time), Auto, Company, Date Offered, Length (minutes), Site, Complete |
+| `2027 OA` | Deadline (date & time), Auto, Company, Date Offered, Length (minutes), Site, Complete, App Row |
 | `2027 HireVue` | same as OA |
-| `2027 Interviews` | Company, Date & Time, Notes, Complete |
-| `2027 Screening` | Company, Date & Time, Notes |
+| `2027 Interviews` | Company, Date & Time, Notes, Complete, App Row |
+| `2027 Screening` | Company, Date & Time, Notes, App Row |
 
-A company can have several OA/HireVue/Interview rows at once — they link back to
-an application by matching Company name (case-insensitive) within the same year.
+A company can have several OA/HireVue/Interview rows at once. **App Row** is the
+row number of the application on the year tab, so an entry stays tied to one role
+when you've applied to several at the same company. The dashboard fills it in for
+entries added from an application, adds the column to older tabs automatically,
+and keeps it correct when an application row is deleted (sorting or inserting rows
+on the year tab by hand will break it). Entries with a blank App Row fall back to
+matching Company name (case-insensitive) within the same year.
 
 The template already includes these headers (and sample year tabs). Use **Make a copy** rather than editing the template itself if you do not own it.
 

@@ -6,6 +6,7 @@ import {
   migrateLegacyStatus,
   normalizeOaComplete,
   normalizeYesNo,
+  statusRank,
   type Application,
   type ApplicationStatus,
   type AssessmentEntry,
@@ -25,7 +26,7 @@ import {
   type Stats,
   type TrackerData,
 } from '../types'
-import { formatDisplayDate, formatSheetDateTime } from './time'
+import { formatDisplayDate, formatSheetDateTime, parseSheetDate } from './time'
 
 /** Required header labels shown in setup help. */
 export const REQUIRED_COLUMN_GUIDE = [
@@ -153,7 +154,14 @@ const LINKED_HEADER_ALIASES = {
     'when',
   ],
   notes: ['notes', 'note', 'details'],
+  appRow: ['app row', 'application row', 'row'],
 } as const
+
+/** Parse an App Row cell into a year-tab row number (null when blank/invalid). */
+function parseAppRow(raw: string): number | null {
+  const n = Number(raw.trim())
+  return Number.isInteger(n) && n >= 2 ? n : null
+}
 
 function normalizeHeader(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, ' ')
@@ -463,6 +471,7 @@ function parseAssessmentSheet(
     lengthMinutes: resolveColumnIndex(headerMap, LINKED_HEADER_ALIASES.lengthMinutes) ?? null,
     site: resolveColumnIndex(headerMap, LINKED_HEADER_ALIASES.site) ?? null,
     complete: resolveColumnIndex(headerMap, LINKED_HEADER_ALIASES.complete) ?? null,
+    appRow: resolveColumnIndex(headerMap, LINKED_HEADER_ALIASES.appRow) ?? null,
   }
 
   const cellAt = (row: string[], idx: number | null) =>
@@ -485,6 +494,7 @@ function parseAssessmentSheet(
       lengthMinutes: cellAt(row, columns.lengthMinutes),
       site: cellAt(row, columns.site),
       complete: normalizeYesNo(cellAt(row, columns.complete)),
+      appRow: parseAppRow(cellAt(row, columns.appRow)),
       sheetRow: i + 1,
     })
   }
@@ -516,6 +526,7 @@ function parseInterviewSheet(values: string[][]): {
     dateTime,
     notes: resolveColumnIndex(headerMap, LINKED_HEADER_ALIASES.notes) ?? null,
     complete: resolveColumnIndex(headerMap, LINKED_HEADER_ALIASES.complete) ?? null,
+    appRow: resolveColumnIndex(headerMap, LINKED_HEADER_ALIASES.appRow) ?? null,
   }
 
   const cellAt = (row: string[], idx: number | null) =>
@@ -534,6 +545,7 @@ function parseInterviewSheet(values: string[][]): {
       dateTime: dateTimeVal,
       notes: cellAt(row, columns.notes),
       complete: normalizeYesNo(cellAt(row, columns.complete)),
+      appRow: parseAppRow(cellAt(row, columns.appRow)),
       sheetRow: i + 1,
     })
   }
@@ -564,6 +576,7 @@ function parseScreeningSheet(values: string[][]): {
     company,
     dateTime,
     notes: resolveColumnIndex(headerMap, LINKED_HEADER_ALIASES.notes) ?? null,
+    appRow: resolveColumnIndex(headerMap, LINKED_HEADER_ALIASES.appRow) ?? null,
   }
 
   const cellAt = (row: string[], idx: number | null) =>
@@ -581,6 +594,7 @@ function parseScreeningSheet(values: string[][]): {
       company: companyVal,
       dateTime: dateTimeVal,
       notes: cellAt(row, columns.notes),
+      appRow: parseAppRow(cellAt(row, columns.appRow)),
       sheetRow: i + 1,
     })
   }
@@ -1143,9 +1157,67 @@ const ASSESSMENT_HEADER_ROW = [
   'Length (minutes)',
   'Site',
   'Complete',
+  'App Row',
 ]
-const INTERVIEW_HEADER_ROW = ['Company', 'Date & Time', 'Notes', 'Complete']
-const SCREENING_HEADER_ROW = ['Company', 'Date & Time', 'Notes']
+const INTERVIEW_HEADER_ROW = ['Company', 'Date & Time', 'Notes', 'Complete', 'App Row']
+const SCREENING_HEADER_ROW = ['Company', 'Date & Time', 'Notes', 'App Row']
+const APP_ROW_HEADER = 'App Row'
+
+function headerMapFor(headers: string[]): Map<string, number> {
+  const map = new Map<string, number>()
+  headers.forEach((h, i) => {
+    if (h) map.set(normalizeHeader(h), i)
+  })
+  return map
+}
+
+/**
+ * Create a linked tab (with default headers) on first use, and add an App Row
+ * header to tabs made before that column existed. Returns the header row.
+ */
+async function prepareLinkedTab(options: {
+  spreadsheetId: string
+  accessToken: string
+  sheetTitle: string
+  defaultHeader: string[]
+}): Promise<string[]> {
+  await ensureSheetTab(options)
+  const existing = await fetchSheetValues(options.spreadsheetId, options.accessToken, options.sheetTitle)
+  const headers = (existing[0] ?? []).map((h) => String(h ?? '').trim())
+  if (!headers.some(Boolean)) {
+    await putSheetValues({ ...options, startCell: 'A1', values: [options.defaultHeader] })
+    return options.defaultHeader
+  }
+  if (resolveColumnIndex(headerMapFor(headers), LINKED_HEADER_ALIASES.appRow) !== undefined) {
+    return headers
+  }
+  let lastUsed = headers.length - 1
+  while (lastUsed >= 0 && !headers[lastUsed]) {
+    lastUsed--
+  }
+  const appRowColumn = lastUsed + 1
+  await putSheetValues({
+    ...options,
+    startCell: `${columnLetter(appRowColumn)}1`,
+    values: [[APP_ROW_HEADER]],
+  })
+  return [...headers.slice(0, appRowColumn), APP_ROW_HEADER]
+}
+
+/** Lay out cell values by 0-based column index (skipping columns the tab lacks). */
+function rowFromCells(cells: [number | null, string][]): string[] {
+  const row: string[] = []
+  for (const [idx, value] of cells) {
+    if (idx === null) continue
+    while (row.length <= idx) row.push('')
+    row[idx] = value
+  }
+  return row
+}
+
+function missingHeadersError(sheetTitle: string, required: string): Error {
+  return new Error(`The "${sheetTitle}" tab needs ${required} headers in row 1.`)
+}
 
 /** Append an OA or HireVue entry, creating the sibling tab (with headers) on first use. */
 export async function appendAssessmentEntry(options: {
@@ -1158,47 +1230,46 @@ export async function appendAssessmentEntry(options: {
   const names = linkedTabNames(options.year)
   const sheetTitle = options.kind === 'OA' ? names.oa : names.hireVue
 
-  await ensureSheetTab({
+  const headers = await prepareLinkedTab({
     spreadsheetId: options.spreadsheetId,
     accessToken: options.accessToken,
     sheetTitle,
+    defaultHeader: ASSESSMENT_HEADER_ROW,
   })
-  const existing = await fetchSheetValues(options.spreadsheetId, options.accessToken, sheetTitle)
-  if (!existing.length) {
-    await putSheetValues({
-      spreadsheetId: options.spreadsheetId,
-      accessToken: options.accessToken,
-      sheetTitle,
-      startCell: 'A1',
-      values: [ASSESSMENT_HEADER_ROW],
-    })
+  const { columns } = parseAssessmentSheet([headers], options.kind)
+  if (!columns) {
+    throw missingHeadersError(sheetTitle, 'Company and Deadline')
   }
 
-  const row = [
-    formatSheetDateTime(options.input.deadline) || options.input.deadline,
-    formatYesNo(options.input.auto),
-    options.input.company,
-    formatDisplayDate(options.input.dateOffered) || options.input.dateOffered,
-    options.input.lengthMinutes,
-    options.input.site,
-    'No',
-  ]
+  const deadline = formatSheetDateTime(options.input.deadline) || options.input.deadline
+  const dateOffered = formatDisplayDate(options.input.dateOffered) || options.input.dateOffered
+  const appRow = options.input.appRow ?? null
   const sheetRow = await appendRow({
     spreadsheetId: options.spreadsheetId,
     accessToken: options.accessToken,
     sheetTitle,
-    row,
+    row: rowFromCells([
+      [columns.deadline, deadline],
+      [columns.auto, formatYesNo(options.input.auto)],
+      [columns.company, options.input.company],
+      [columns.dateOffered, dateOffered],
+      [columns.lengthMinutes, options.input.lengthMinutes],
+      [columns.site, options.input.site],
+      [columns.complete, 'No'],
+      [columns.appRow, appRow === null ? '' : String(appRow)],
+    ]),
   })
 
   return {
     kind: options.kind,
     company: options.input.company,
-    deadline: row[0]!,
+    deadline,
     auto: options.input.auto,
-    dateOffered: row[3]!,
+    dateOffered,
     lengthMinutes: options.input.lengthMinutes,
     site: options.input.site,
     complete: false,
+    appRow,
     sheetRow,
   }
 }
@@ -1212,28 +1283,29 @@ export async function appendInterviewEntry(options: {
 }): Promise<InterviewEntry> {
   const sheetTitle = linkedTabNames(options.year).interviews
 
-  await ensureSheetTab({
+  const headers = await prepareLinkedTab({
     spreadsheetId: options.spreadsheetId,
     accessToken: options.accessToken,
     sheetTitle,
+    defaultHeader: INTERVIEW_HEADER_ROW,
   })
-  const existing = await fetchSheetValues(options.spreadsheetId, options.accessToken, sheetTitle)
-  if (!existing.length) {
-    await putSheetValues({
-      spreadsheetId: options.spreadsheetId,
-      accessToken: options.accessToken,
-      sheetTitle,
-      startCell: 'A1',
-      values: [INTERVIEW_HEADER_ROW],
-    })
+  const { columns } = parseInterviewSheet([headers])
+  if (!columns) {
+    throw missingHeadersError(sheetTitle, 'Company and Date & Time')
   }
 
-  const row = [options.input.company, options.input.dateTime, options.input.notes, 'No']
+  const appRow = options.input.appRow ?? null
   const sheetRow = await appendRow({
     spreadsheetId: options.spreadsheetId,
     accessToken: options.accessToken,
     sheetTitle,
-    row,
+    row: rowFromCells([
+      [columns.company, options.input.company],
+      [columns.dateTime, options.input.dateTime],
+      [columns.notes, options.input.notes],
+      [columns.complete, 'No'],
+      [columns.appRow, appRow === null ? '' : String(appRow)],
+    ]),
   })
 
   return {
@@ -1241,6 +1313,7 @@ export async function appendInterviewEntry(options: {
     dateTime: options.input.dateTime,
     notes: options.input.notes,
     complete: false,
+    appRow,
     sheetRow,
   }
 }
@@ -1254,36 +1327,100 @@ export async function appendScreeningEntry(options: {
 }): Promise<ScreeningEntry> {
   const sheetTitle = linkedTabNames(options.year).screening
 
-  await ensureSheetTab({
+  const headers = await prepareLinkedTab({
     spreadsheetId: options.spreadsheetId,
     accessToken: options.accessToken,
     sheetTitle,
+    defaultHeader: SCREENING_HEADER_ROW,
   })
-  const existing = await fetchSheetValues(options.spreadsheetId, options.accessToken, sheetTitle)
-  if (!existing.length) {
-    await putSheetValues({
-      spreadsheetId: options.spreadsheetId,
-      accessToken: options.accessToken,
-      sheetTitle,
-      startCell: 'A1',
-      values: [SCREENING_HEADER_ROW],
-    })
+  const { columns } = parseScreeningSheet([headers])
+  if (!columns) {
+    throw missingHeadersError(sheetTitle, 'Company and Date & Time')
   }
 
-  const row = [options.input.company, options.input.dateTime, options.input.notes]
+  const appRow = options.input.appRow ?? null
   const sheetRow = await appendRow({
     spreadsheetId: options.spreadsheetId,
     accessToken: options.accessToken,
     sheetTitle,
-    row,
+    row: rowFromCells([
+      [columns.company, options.input.company],
+      [columns.dateTime, options.input.dateTime],
+      [columns.notes, options.input.notes],
+      [columns.appRow, appRow === null ? '' : String(appRow)],
+    ]),
   })
 
   return {
     company: options.input.company,
     dateTime: options.input.dateTime,
     notes: options.input.notes,
+    appRow,
     sheetRow,
   }
+}
+
+/**
+ * After deleting year-tab row `deletedRow`, keep every linked tab's App Row
+ * pointing at the same application: rows below shift up by one, and entries
+ * that pointed at the deleted application are cleared.
+ */
+export async function shiftLinkedAppRows(options: {
+  spreadsheetId: string
+  accessToken: string
+  year: string
+  deletedRow: number
+}): Promise<void> {
+  const names = linkedTabNames(options.year)
+  const tabs = [names.oa, names.hireVue, names.interviews, names.screening]
+  const data: { range: string; values: string[][] }[] = []
+
+  for (const sheetTitle of tabs) {
+    const values = await fetchOptionalSheetValues(options.spreadsheetId, options.accessToken, sheetTitle)
+    if (!values?.length) continue
+    const col = resolveColumnIndex(
+      headerMapFor(values[0].map((h) => String(h ?? '').trim())),
+      LINKED_HEADER_ALIASES.appRow,
+    )
+    if (col === undefined) continue
+    for (let i = 1; i < values.length; i++) {
+      const appRow = parseAppRow(String(values[i][col] ?? ''))
+      if (appRow === null || appRow < options.deletedRow) continue
+      data.push({
+        range: a1RangeForSheet(sheetTitle, `${columnLetter(col)}${i + 1}`),
+        values: [[appRow === options.deletedRow ? '' : String(appRow - 1)]],
+      })
+    }
+  }
+
+  if (!data.length) return
+
+  const res = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(options.spreadsheetId)}/values:batchUpdate`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${options.accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ valueInputOption: 'USER_ENTERED', data }),
+    },
+  )
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Could not update App Row references (${res.status}): ${body.slice(0, 200)}`)
+  }
+}
+
+/** Local-state version of shiftLinkedAppRows. */
+export function shiftAppRowAfterDelete<T extends { appRow: number | null }>(
+  list: T[],
+  deletedRow: number,
+): T[] {
+  return list.map((entry) => {
+    if (entry.appRow === null || entry.appRow < deletedRow) return entry
+    return { ...entry, appRow: entry.appRow === deletedRow ? null : entry.appRow - 1 }
+  })
 }
 
 /** Toggle the Complete cell for an OA/HireVue or Interview entry. */
@@ -1312,16 +1449,85 @@ export function matchesCompany(entryCompany: string, appCompany: string): boolea
   return entryCompany.trim().toLowerCase() === appCompany.trim().toLowerCase()
 }
 
-/** All linked OA/HireVue/Interview/Screening entries for one company. */
-export function linkedEntriesForCompany(
-  data: Pick<LinkedTrackerData, 'oaEntries' | 'hireVueEntries' | 'interviewEntries' | 'screeningEntries'>,
+/**
+ * The application a linked entry most likely belongs to. Entries only record a
+ * company, so when there are several roles at that company, prefer the one whose
+ * current status matches the stage that produces this kind of entry (Progressed
+ * for an OA/HireVue, Interview for an interview), then the furthest-along one,
+ * then the most recently updated.
+ */
+export function applicationForEntry(
+  applications: Application[],
   company: string,
+  preferredStatus?: ApplicationStatus,
+): Application | undefined {
+  const matches = applications.filter((app) => matchesCompany(app.company, company))
+  if (matches.length <= 1) {
+    return matches[0]
+  }
+  const updatedAt = (app: Application) =>
+    parseSheetDate(app.lastUpdated ?? '')?.getTime() ?? parseSheetDate(app.dateApplied)?.getTime() ?? 0
+  return matches.slice().sort((a, b) => {
+    if (preferredStatus) {
+      const aPreferred = a.status === preferredStatus ? 1 : 0
+      const bPreferred = b.status === preferredStatus ? 1 : 0
+      if (aPreferred !== bPreferred) {
+        return bPreferred - aPreferred
+      }
+    }
+    const rankDiff = statusRank(b.status) - statusRank(a.status)
+    if (rankDiff !== 0) {
+      return rankDiff
+    }
+    return updatedAt(b) - updatedAt(a)
+  })[0]
+}
+
+/** The application an entry's App Row points at, if it's set and still the same company. */
+function referencedApplication(
+  entry: { company: string; appRow: number | null },
+  applications: Application[],
+): Application | undefined {
+  if (entry.appRow === null) return undefined
+  const app = applications.find((a) => a.sheetRow === entry.appRow)
+  return app && matchesCompany(app.company, entry.company) ? app : undefined
+}
+
+/**
+ * The application a linked entry belongs to: its App Row when that's set,
+ * otherwise the best company match (see applicationForEntry).
+ */
+export function linkedApplicationFor(
+  entry: { company: string; appRow: number | null },
+  applications: Application[],
+  preferredStatus?: ApplicationStatus,
+): Application | undefined {
+  return (
+    referencedApplication(entry, applications) ??
+    applicationForEntry(applications, entry.company, preferredStatus)
+  )
+}
+
+/**
+ * All linked OA/HireVue/Interview/Screening entries for one application. Entries
+ * with an App Row show only on that application; entries without one (added
+ * before the column existed) show on every application at that company.
+ */
+export function linkedEntriesForApplication(
+  data: Pick<LinkedTrackerData, 'oaEntries' | 'hireVueEntries' | 'interviewEntries' | 'screeningEntries'>,
+  app: Application,
+  applications: Application[],
 ) {
+  const belongs = (entry: { company: string; appRow: number | null }) => {
+    if (!matchesCompany(entry.company, app.company)) return false
+    const referenced = referencedApplication(entry, applications)
+    return referenced ? referenced.sheetRow === app.sheetRow : true
+  }
   return {
-    oa: data.oaEntries.filter((e) => matchesCompany(e.company, company)),
-    hireVue: data.hireVueEntries.filter((e) => matchesCompany(e.company, company)),
-    interviews: data.interviewEntries.filter((e) => matchesCompany(e.company, company)),
-    screenings: data.screeningEntries.filter((e) => matchesCompany(e.company, company)),
+    oa: data.oaEntries.filter(belongs),
+    hireVue: data.hireVueEntries.filter(belongs),
+    interviews: data.interviewEntries.filter(belongs),
+    screenings: data.screeningEntries.filter(belongs),
   }
 }
 

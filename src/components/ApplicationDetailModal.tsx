@@ -268,7 +268,7 @@ export function ApplicationDetailModal({
                 entries={linked.oa}
                 companyDefault={app.company}
                 disabled={saving}
-                onAdd={linkedActions ? (input) => linkedActions.addOa(input) : undefined}
+                onAdd={linkedActions ? (input) => linkedActions.addOa({ ...input, appRow: app.sheetRow }) : undefined}
                 onToggleComplete={
                   linkedActions
                     ? (entry, complete) => linkedActions.toggleOaComplete(entry, complete)
@@ -281,7 +281,7 @@ export function ApplicationDetailModal({
                 entries={linked.hireVue}
                 companyDefault={app.company}
                 disabled={saving}
-                onAdd={linkedActions ? (input) => linkedActions.addHireVue(input) : undefined}
+                onAdd={linkedActions ? (input) => linkedActions.addHireVue({ ...input, appRow: app.sheetRow }) : undefined}
                 onToggleComplete={
                   linkedActions
                     ? (entry, complete) => linkedActions.toggleHireVueComplete(entry, complete)
@@ -295,7 +295,7 @@ export function ApplicationDetailModal({
                 companyDefault={app.company}
                 disabled={saving}
                 showComplete={false}
-                onAdd={linkedActions ? (input) => linkedActions.addScreening(input) : undefined}
+                onAdd={linkedActions ? (input) => linkedActions.addScreening({ ...input, appRow: app.sheetRow }) : undefined}
                 onDelete={linkedActions ? (entry) => linkedActions.deleteScreening(entry) : undefined}
               />
               <DateEntriesPanel
@@ -304,7 +304,7 @@ export function ApplicationDetailModal({
                 companyDefault={app.company}
                 disabled={saving}
                 showComplete
-                onAdd={linkedActions ? (input) => linkedActions.addInterview(input) : undefined}
+                onAdd={linkedActions ? (input) => linkedActions.addInterview({ ...input, appRow: app.sheetRow }) : undefined}
                 onToggleComplete={
                   linkedActions
                     ? (entry, complete) => linkedActions.toggleInterviewComplete(entry, complete)

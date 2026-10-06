@@ -14,7 +14,7 @@ import { DueSoonBanner } from '../components/DueSoonBanner'
 import { AppsPerDayChart } from '../components/AppsPerDayChart'
 import { ApplicationDetailModal } from '../components/ApplicationDetailModal'
 import { NewApplicationModal } from '../components/NewApplicationModal'
-import { computeStats, linkedEntriesForCompany, matchesCompany } from '../lib/sheet'
+import { applicationForEntry, computeStats, linkedEntriesForApplication } from '../lib/sheet'
 import type { ApplicationsStatusFilter, StatusEditChange } from './ApplicationsView'
 
 interface DashboardViewProps {
@@ -64,10 +64,10 @@ export function DashboardView({
       ? null
       : (data.applications.find((a) => a.sheetRow === detailApp.sheetRow) ?? detailApp)
 
-  const detailLinked = detailAppLive ? linkedEntriesForCompany(data, detailAppLive.company) : undefined
+  const detailLinked = detailAppLive ? linkedEntriesForApplication(data, detailAppLive, data.applications) : undefined
 
   function openCompany(company: string) {
-    const app = data.applications.find((a) => matchesCompany(a.company, company))
+    const app = applicationForEntry(data.applications, company, 'Progressed')
     if (app) {
       setDetailApp(app)
     }
@@ -204,9 +204,10 @@ export function DashboardView({
           <ToDoCard
             oaEntries={data.oaEntries}
             hireVueEntries={data.hireVueEntries}
+            interviewEntries={data.interviewEntries}
             applications={data.applications}
             onOpenAll={onOpenInProgress}
-            onSelectCompany={openCompany}
+            onSelectApplication={setDetailApp}
             onApplyClick={() => setNewOpen(true)}
           />
         </div>

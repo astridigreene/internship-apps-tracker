@@ -39,6 +39,8 @@ import {
   nextSummerYear,
   pickDefaultYear,
   SheetSetupError,
+  shiftAppRowAfterDelete,
+  shiftLinkedAppRows,
   updateLinkedComplete,
   updateSheetStatus,
 } from './lib/sheet'
@@ -621,11 +623,16 @@ export default function App() {
       ...data,
       applications: nextApps,
       stats: computeStats(nextApps),
+      oaEntries: shiftAppRowAfterDelete(data.oaEntries, app.sheetRow),
+      hireVueEntries: shiftAppRowAfterDelete(data.hireVueEntries, app.sheetRow),
+      interviewEntries: shiftAppRowAfterDelete(data.interviewEntries, app.sheetRow),
+      screeningEntries: shiftAppRowAfterDelete(data.screeningEntries, app.sheetRow),
       lastSynced: new Date().toISOString(),
     })
 
+    let token: string
     try {
-      const token = await ensureFreshToken()
+      token = await ensureFreshToken()
       await deleteSheetRow({
         spreadsheetId: sheetId,
         accessToken: token,
@@ -634,9 +641,26 @@ export default function App() {
       })
     } catch (err) {
       setData(previous)
+      setDeleting(false)
       const message = err instanceof Error ? err.message : 'Could not delete application'
       setError(message)
       throw err instanceof Error ? err : new Error(message)
+    }
+
+    // The row is gone either way; a failure here just leaves stale App Row cells.
+    try {
+      await shiftLinkedAppRows({
+        spreadsheetId: sheetId,
+        accessToken: token,
+        year: selectedYear,
+        deletedRow: app.sheetRow,
+      })
+    } catch (err) {
+      setError(
+        `Deleted the application, but couldn't update App Row references in the OA/HireVue/Interviews/Screening tabs: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      )
     } finally {
       setDeleting(false)
     }
