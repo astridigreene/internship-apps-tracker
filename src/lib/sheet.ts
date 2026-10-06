@@ -26,7 +26,7 @@ import {
   type Stats,
   type TrackerData,
 } from '../types'
-import { formatDisplayDate, formatSheetDateTime, parseSheetDate } from './time'
+import { formatDisplayDate, formatSheetDateTime, formatTimeOfDay, parseSheetDate, parseTimeOfDay } from './time'
 
 /** Required header labels shown in setup help. */
 export const REQUIRED_COLUMN_GUIDE = [
@@ -154,6 +154,7 @@ const LINKED_HEADER_ALIASES = {
     'when',
   ],
   notes: ['notes', 'note', 'details'],
+  endTime: ['end time', 'end', 'ends', 'ends at', 'until'],
   appRow: ['app row', 'application row', 'row'],
 } as const
 
@@ -524,6 +525,7 @@ function parseInterviewSheet(values: string[][]): {
   const columns: InterviewSheetColumns = {
     company,
     dateTime,
+    endTime: resolveColumnIndex(headerMap, LINKED_HEADER_ALIASES.endTime) ?? null,
     notes: resolveColumnIndex(headerMap, LINKED_HEADER_ALIASES.notes) ?? null,
     complete: resolveColumnIndex(headerMap, LINKED_HEADER_ALIASES.complete) ?? null,
     appRow: resolveColumnIndex(headerMap, LINKED_HEADER_ALIASES.appRow) ?? null,
@@ -543,6 +545,7 @@ function parseInterviewSheet(values: string[][]): {
     entries.push({
       company: companyVal,
       dateTime: dateTimeVal,
+      endTime: cellAt(row, columns.endTime),
       notes: cellAt(row, columns.notes),
       complete: normalizeYesNo(cellAt(row, columns.complete)),
       appRow: parseAppRow(cellAt(row, columns.appRow)),
@@ -575,6 +578,7 @@ function parseScreeningSheet(values: string[][]): {
   const columns: ScreeningSheetColumns = {
     company,
     dateTime,
+    endTime: resolveColumnIndex(headerMap, LINKED_HEADER_ALIASES.endTime) ?? null,
     notes: resolveColumnIndex(headerMap, LINKED_HEADER_ALIASES.notes) ?? null,
     appRow: resolveColumnIndex(headerMap, LINKED_HEADER_ALIASES.appRow) ?? null,
   }
@@ -593,6 +597,7 @@ function parseScreeningSheet(values: string[][]): {
     entries.push({
       company: companyVal,
       dateTime: dateTimeVal,
+      endTime: cellAt(row, columns.endTime),
       notes: cellAt(row, columns.notes),
       appRow: parseAppRow(cellAt(row, columns.appRow)),
       sheetRow: i + 1,
@@ -1178,9 +1183,13 @@ const ASSESSMENT_HEADER_ROW = [
   'Complete',
   'App Row',
 ]
-const INTERVIEW_HEADER_ROW = ['Company', 'Date & Time', 'Notes', 'Complete', 'App Row']
-const SCREENING_HEADER_ROW = ['Company', 'Date & Time', 'Notes', 'App Row']
-const APP_ROW_HEADER = 'App Row'
+const INTERVIEW_HEADER_ROW = ['Company', 'Date & Time', 'End Time', 'Notes', 'Complete', 'App Row']
+const SCREENING_HEADER_ROW = ['Company', 'Date & Time', 'End Time', 'Notes', 'App Row']
+/** Columns added to an existing linked tab (after its last header) when it doesn't have them yet. */
+const ADDED_LINKED_HEADERS = {
+  endTime: 'End Time',
+  appRow: 'App Row',
+} as const
 
 function headerMapFor(headers: string[]): Map<string, number> {
   const map = new Map<string, number>()
@@ -1191,14 +1200,16 @@ function headerMapFor(headers: string[]): Map<string, number> {
 }
 
 /**
- * Create a linked tab (with default headers) on first use, and add an App Row
- * header to tabs made before that column existed. Returns the header row.
+ * Create a linked tab (with default headers) on first use, and add any of
+ * `addHeaders` (App Row is always included) to tabs made before those columns
+ * existed. Returns the header row.
  */
 async function prepareLinkedTab(options: {
   spreadsheetId: string
   accessToken: string
   sheetTitle: string
   defaultHeader: string[]
+  addHeaders?: (keyof typeof ADDED_LINKED_HEADERS)[]
 }): Promise<string[]> {
   await ensureSheetTab(options)
   const existing = await fetchSheetValues(options.spreadsheetId, options.accessToken, options.sheetTitle)
@@ -1207,20 +1218,23 @@ async function prepareLinkedTab(options: {
     await putSheetValues({ ...options, startCell: 'A1', values: [options.defaultHeader] })
     return options.defaultHeader
   }
-  if (resolveColumnIndex(headerMapFor(headers), LINKED_HEADER_ALIASES.appRow) !== undefined) {
+  const missing = [...(options.addHeaders ?? []), 'appRow' as const].filter(
+    (key) => resolveColumnIndex(headerMapFor(headers), LINKED_HEADER_ALIASES[key]) === undefined,
+  )
+  if (!missing.length) {
     return headers
   }
   let lastUsed = headers.length - 1
   while (lastUsed >= 0 && !headers[lastUsed]) {
     lastUsed--
   }
-  const appRowColumn = lastUsed + 1
+  const added = missing.map((key) => ADDED_LINKED_HEADERS[key])
   await putSheetValues({
     ...options,
-    startCell: `${columnLetter(appRowColumn)}1`,
-    values: [[APP_ROW_HEADER]],
+    startCell: `${columnLetter(lastUsed + 1)}1`,
+    values: [added],
   })
-  return [...headers.slice(0, appRowColumn), APP_ROW_HEADER]
+  return [...headers.slice(0, lastUsed + 1), ...added]
 }
 
 /** Lay out cell values by 0-based column index (skipping columns the tab lacks). */
@@ -1232,6 +1246,12 @@ function rowFromCells(cells: [number | null, string][]): string[] {
     row[idx] = value
   }
   return row
+}
+
+/** An `<input type="time">` value (HH:MM) as the "h:mm AM/PM" text Sheets reads as a time. */
+function formatEndTime(raw: string | undefined): string {
+  const minutes = parseTimeOfDay(raw ?? '')
+  return minutes === null ? (raw ?? '').trim() : formatTimeOfDay(minutes)
 }
 
 function missingHeadersError(sheetTitle: string, required: string): Error {
@@ -1308,6 +1328,7 @@ export async function appendInterviewEntry(options: {
     accessToken: options.accessToken,
     sheetTitle,
     defaultHeader: INTERVIEW_HEADER_ROW,
+    addHeaders: ['endTime'],
   })
   const { columns } = parseInterviewSheet([headers])
   if (!columns) {
@@ -1315,13 +1336,16 @@ export async function appendInterviewEntry(options: {
   }
 
   const appRow = options.input.appRow ?? null
+  const dateTime = formatSheetDateTime(options.input.dateTime) || options.input.dateTime
+  const endTime = formatEndTime(options.input.endTime)
   const sheetRow = await appendRow({
     spreadsheetId: options.spreadsheetId,
     accessToken: options.accessToken,
     sheetTitle,
     row: rowFromCells([
       [columns.company, options.input.company],
-      [columns.dateTime, options.input.dateTime],
+      [columns.dateTime, dateTime],
+      [columns.endTime, endTime],
       [columns.notes, options.input.notes],
       [columns.complete, 'No'],
       [columns.appRow, appRow === null ? '' : String(appRow)],
@@ -1331,7 +1355,8 @@ export async function appendInterviewEntry(options: {
 
   return {
     company: options.input.company,
-    dateTime: options.input.dateTime,
+    dateTime,
+    endTime,
     notes: options.input.notes,
     complete: false,
     appRow,
@@ -1353,6 +1378,7 @@ export async function appendScreeningEntry(options: {
     accessToken: options.accessToken,
     sheetTitle,
     defaultHeader: SCREENING_HEADER_ROW,
+    addHeaders: ['endTime'],
   })
   const { columns } = parseScreeningSheet([headers])
   if (!columns) {
@@ -1360,13 +1386,16 @@ export async function appendScreeningEntry(options: {
   }
 
   const appRow = options.input.appRow ?? null
+  const dateTime = formatSheetDateTime(options.input.dateTime) || options.input.dateTime
+  const endTime = formatEndTime(options.input.endTime)
   const sheetRow = await appendRow({
     spreadsheetId: options.spreadsheetId,
     accessToken: options.accessToken,
     sheetTitle,
     row: rowFromCells([
       [columns.company, options.input.company],
-      [columns.dateTime, options.input.dateTime],
+      [columns.dateTime, dateTime],
+      [columns.endTime, endTime],
       [columns.notes, options.input.notes],
       [columns.appRow, appRow === null ? '' : String(appRow)],
     ]),
@@ -1375,7 +1404,8 @@ export async function appendScreeningEntry(options: {
 
   return {
     company: options.input.company,
-    dateTime: options.input.dateTime,
+    dateTime,
+    endTime,
     notes: options.input.notes,
     appRow,
     sheetRow,
@@ -1423,7 +1453,7 @@ export async function updateLinkedAppRow(options: {
   })
   const col = resolveColumnIndex(headerMapFor(headers), LINKED_HEADER_ALIASES.appRow)
   if (col === undefined) {
-    throw missingHeadersError(sheetTitle, 'an App Row')
+    throw missingHeadersError(sheetTitle, `an ${ADDED_LINKED_HEADERS.appRow}`)
   }
   await putSheetValues({
     spreadsheetId: options.spreadsheetId,

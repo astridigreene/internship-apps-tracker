@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import type { Application, AssessmentEntry, InterviewEntry } from '../types'
-import { formatDueInDays, isExpired, isSameDay, parseSheetDate } from '../lib/time'
+import { endMoment, formatDueInDays, isExpired, isSameDay, parseSheetDate } from '../lib/time'
 import { linkedApplicationFor } from '../lib/sheet'
 
 const DAILY_APPLY_GOAL = 3
@@ -44,7 +44,11 @@ export function ToDoCard({
         app: linkedApplicationFor(entry, applications, 'Progressed'),
       }))
     const interviews: PendingItem[] = interviewEntries
-      .filter((entry) => !entry.complete && !isExpired(parseSheetDate(entry.dateTime)))
+      .filter((entry) => {
+        // Stays on the list until it's over: its end time when set, else its start.
+        const start = parseSheetDate(entry.dateTime)
+        return !entry.complete && !isExpired(endMoment(start, entry.endTime) ?? start)
+      })
       .map((entry) => ({
         key: `Interview-${entry.sheetRow}`,
         kind: 'Interview',

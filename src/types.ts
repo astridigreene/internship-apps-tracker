@@ -231,6 +231,8 @@ export interface NewAssessmentInput {
 export interface InterviewEntry {
   company: string
   dateTime: string
+  /** Time of day it ends (End Time column), e.g. "11:45 AM"; '' when not set. */
+  endTime: string
   notes: string
   complete: boolean
   /** Row of the application this belongs to on the year tab (App Row column), if recorded. */
@@ -241,6 +243,8 @@ export interface InterviewEntry {
 export interface NewInterviewInput {
   company: string
   dateTime: string
+  /** Time of day it ends, as HH:MM (from `<input type="time">`); optional. */
+  endTime?: string
   notes: string
   /** Year-tab row of the application this belongs to. */
   appRow?: number
@@ -250,6 +254,8 @@ export interface NewInterviewInput {
 export interface ScreeningEntry {
   company: string
   dateTime: string
+  /** Time of day it ends (End Time column), e.g. "11:45 AM"; '' when not set. */
+  endTime: string
   notes: string
   /** Row of the application this belongs to on the year tab (App Row column), if recorded. */
   appRow: number | null
@@ -259,6 +265,8 @@ export interface ScreeningEntry {
 export interface NewScreeningInput {
   company: string
   dateTime: string
+  /** Time of day it ends, as HH:MM (from `<input type="time">`); optional. */
+  endTime?: string
   notes: string
   /** Year-tab row of the application this belongs to. */
   appRow?: number
@@ -280,6 +288,7 @@ export interface AssessmentSheetColumns {
 export interface InterviewSheetColumns {
   company: number
   dateTime: number
+  endTime: number | null
   notes: number | null
   complete: number | null
   appRow: number | null
@@ -289,6 +298,7 @@ export interface InterviewSheetColumns {
 export interface ScreeningSheetColumns {
   company: number
   dateTime: number
+  endTime: number | null
   notes: number | null
   appRow: number | null
 }

@@ -199,6 +199,44 @@ export function formatSheetDateTime(value: string | Date | null | undefined): st
   return `${datePart} ${hours12}:${minutes} ${ampm}`
 }
 
+/**
+ * Parse a time of day ("14:30", "2:30 PM", "2:30:00 PM", or a full date-time
+ * whose time part is used) into minutes after midnight.
+ */
+export function parseTimeOfDay(value: string): number | null {
+  const raw = value.trim()
+  if (!raw) {
+    return null
+  }
+  const match = raw.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?$/i)
+  if (match) {
+    let hours = Number(match[1])
+    const minutes = Number(match[2])
+    const ampm = match[3]?.toUpperCase()
+    if (ampm === 'PM' && hours < 12) hours += 12
+    if (ampm === 'AM' && hours === 12) hours = 0
+    return hours < 24 && minutes < 60 ? hours * 60 + minutes : null
+  }
+  const date = parseSheetDate(raw)
+  return date ? date.getHours() * 60 + date.getMinutes() : null
+}
+
+/** Minutes after midnight as "2:30 PM". */
+export function formatTimeOfDay(minutes: number): string {
+  const hours24 = Math.floor(minutes / 60) % 24
+  const hours12 = hours24 % 12 === 0 ? 12 : hours24 % 12
+  return `${hours12}:${String(minutes % 60).padStart(2, '0')} ${hours24 < 12 ? 'AM' : 'PM'}`
+}
+
+/** The start's date at the given end time of day, or null when either is missing. */
+export function endMoment(start: Date | null, endTime: string): Date | null {
+  const minutes = parseTimeOfDay(endTime)
+  if (!start || minutes === null) {
+    return null
+  }
+  return new Date(start.getFullYear(), start.getMonth(), start.getDate(), Math.floor(minutes / 60), minutes % 60)
+}
+
 /** Stamp written into the Last Updated column (M/D/YYYY). */
 export function statusUpdateStamp(now = new Date()): string {
   return formatDisplayDate(now)

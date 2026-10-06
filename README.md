@@ -53,8 +53,8 @@ make them by hand:
 | --- | --- |
 | `2027 OA` | Deadline (date & time), Auto, Company, Date Offered, Length (minutes), Site, Complete, App Row |
 | `2027 HireVue` | same as OA |
-| `2027 Interviews` | Company, Date & Time, Notes, Complete, App Row |
-| `2027 Screening` | Company, Date & Time, Notes, App Row |
+| `2027 Interviews` | Company, Date & Time, End Time, Notes, Complete, App Row |
+| `2027 Screening` | Company, Date & Time, End Time, Notes, App Row |
 
 A company can have several OA/HireVue/Interview rows at once. **App Row** is the
 row number of the application on the year tab, so an entry stays tied to one role

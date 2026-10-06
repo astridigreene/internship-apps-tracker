@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import type { InterviewEntry, NewInterviewInput, NewScreeningInput, ScreeningEntry } from '../types'
-import { parseSheetDate } from '../lib/time'
+import { formatDisplayDateTime, formatTimeOfDay, parseSheetDate, parseTimeOfDay } from '../lib/time'
 import { DeleteButton, UnlinkedNote } from './EntryControls'
 
 type Entry = InterviewEntry | ScreeningEntry
@@ -19,7 +19,7 @@ interface DateEntriesPanelProps<E extends Entry> {
   onLink?: (entry: E) => Promise<void>
 }
 
-const EMPTY = (company: string): Input => ({ company, dateTime: '', notes: '' })
+const EMPTY = (company: string): Input => ({ company, dateTime: '', endTime: '', notes: '' })
 
 function hasComplete(entry: Entry): entry is InterviewEntry {
   return 'complete' in entry
@@ -55,6 +55,12 @@ export function DateEntriesPanel<E extends Entry>({
     if (!onAdd) return
     if (!form.company.trim() || !form.dateTime.trim()) {
       setError('Company and Date & Time are required.')
+      return
+    }
+    const startMinutes = parseTimeOfDay(form.dateTime)
+    const endMinutes = parseTimeOfDay(form.endTime ?? '')
+    if (startMinutes !== null && endMinutes !== null && endMinutes <= startMinutes) {
+      setError('End time must be after the start time.')
       return
     }
     setSubmitting(true)
@@ -102,16 +108,27 @@ export function DateEntriesPanel<E extends Entry>({
               className={fieldClass}
             />
           ) : null}
-          <label className="block text-[10px] font-bold uppercase text-app-text-weak">
-            Date & Time
-            <input
-              type="datetime-local"
-              required
-              value={form.dateTime}
-              onChange={(e) => setForm((f) => ({ ...f, dateTime: e.target.value }))}
-              className={fieldClass}
-            />
-          </label>
+          <div className="grid grid-cols-[2fr_1fr] gap-1.5">
+            <label className="block text-[10px] font-bold uppercase text-app-text-weak">
+              Date & Time
+              <input
+                type="datetime-local"
+                required
+                value={form.dateTime}
+                onChange={(e) => setForm((f) => ({ ...f, dateTime: e.target.value }))}
+                className={fieldClass}
+              />
+            </label>
+            <label className="block text-[10px] font-bold uppercase text-app-text-weak">
+              End time
+              <input
+                type="time"
+                value={form.endTime ?? ''}
+                onChange={(e) => setForm((f) => ({ ...f, endTime: e.target.value }))}
+                className={fieldClass}
+              />
+            </label>
+          </div>
           <label className="block text-[10px] font-bold uppercase text-app-text-weak">
             Notes
             <input
@@ -135,43 +152,48 @@ export function DateEntriesPanel<E extends Entry>({
         <p className="px-2.5 py-2.5 text-[12px] text-app-text-weak">No {kind.toLowerCase()}s yet.</p>
       ) : (
         <ul className="divide-y divide-app-border">
-          {sorted.map((entry) => (
-            <li key={entry.sheetRow} className="flex items-center gap-2 px-2.5 py-2">
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[12px] font-bold text-app-text">
-                  {entry.dateTime || 'No date/time'}
-                </p>
-                {entry.notes ? (
-                  <p className="truncate text-[11px] text-app-text-weak">{entry.notes}</p>
+          {sorted.map((entry) => {
+            const endMinutes = parseTimeOfDay(entry.endTime)
+            const end = endMinutes === null ? entry.endTime : formatTimeOfDay(endMinutes)
+            return (
+              <li key={entry.sheetRow} className="flex items-center gap-2 px-2.5 py-2">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[12px] font-bold text-app-text">
+                    {formatDisplayDateTime(entry.dateTime) || entry.dateTime || 'No date/time'}
+                    {end ? ` – ${end}` : ''}
+                  </p>
+                  {entry.notes ? (
+                    <p className="truncate text-[11px] text-app-text-weak">{entry.notes}</p>
+                  ) : null}
+                  {entry.appRow === null && onLink ? (
+                    <UnlinkedNote disabled={disabled} onLink={() => onLink(entry)} />
+                  ) : null}
+                </div>
+                {showComplete && hasComplete(entry) && onToggleComplete ? (
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => void onToggleComplete(entry, !entry.complete)}
+                    className={[
+                      'shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold',
+                      entry.complete
+                        ? 'bg-kpi-offer-bg text-kpi-offer-text'
+                        : 'bg-kpi-oa-bg text-kpi-oa-text',
+                    ].join(' ')}
+                  >
+                    {entry.complete ? 'Complete' : 'Pending'}
+                  </button>
                 ) : null}
-                {entry.appRow === null && onLink ? (
-                  <UnlinkedNote disabled={disabled} onLink={() => onLink(entry)} />
+                {onDelete ? (
+                  <DeleteButton
+                    label={`Delete ${kind} entry`}
+                    disabled={disabled}
+                    onConfirm={() => onDelete(entry)}
+                  />
                 ) : null}
-              </div>
-              {showComplete && hasComplete(entry) && onToggleComplete ? (
-                <button
-                  type="button"
-                  disabled={disabled}
-                  onClick={() => void onToggleComplete(entry, !entry.complete)}
-                  className={[
-                    'shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold',
-                    entry.complete
-                      ? 'bg-kpi-offer-bg text-kpi-offer-text'
-                      : 'bg-kpi-oa-bg text-kpi-oa-text',
-                  ].join(' ')}
-                >
-                  {entry.complete ? 'Complete' : 'Pending'}
-                </button>
-              ) : null}
-              {onDelete ? (
-                <DeleteButton
-                  label={`Delete ${kind} entry`}
-                  disabled={disabled}
-                  onConfirm={() => onDelete(entry)}
-                />
-              ) : null}
-            </li>
-          ))}
+              </li>
+            )
+          })}
         </ul>
       )}
     </div>
