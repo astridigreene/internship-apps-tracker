@@ -41,7 +41,9 @@ import {
   SheetSetupError,
   shiftAppRowAfterDelete,
   shiftLinkedAppRows,
+  updateLinkedAppRow,
   updateLinkedComplete,
+  type LinkedKind,
   updateSheetStatus,
 } from './lib/sheet'
 import { statusUpdateStamp } from './lib/time'
@@ -674,7 +676,7 @@ export default function App() {
 
   async function handleAddAssessment(kind: 'OA' | 'HireVue', input: NewAssessmentInput) {
     if (!accessToken || !data || !sheetId) {
-      return
+      throw new Error('Not connected to your sheet yet. Refresh the page and try again.')
     }
     setError(null)
     setSaving(true)
@@ -704,7 +706,7 @@ export default function App() {
 
   async function handleAddInterview(input: NewInterviewInput) {
     if (!accessToken || !data || !sheetId) {
-      return
+      throw new Error('Not connected to your sheet yet. Refresh the page and try again.')
     }
     setError(null)
     setSaving(true)
@@ -730,7 +732,7 @@ export default function App() {
 
   async function handleAddScreening(input: NewScreeningInput) {
     if (!accessToken || !data || !sheetId) {
-      return
+      throw new Error('Not connected to your sheet yet. Refresh the page and try again.')
     }
     setError(null)
     setSaving(true)
@@ -924,6 +926,50 @@ export default function App() {
     }
   }
 
+  async function handleLinkEntry(
+    kind: LinkedKind,
+    entry: AssessmentEntry | InterviewEntry | ScreeningEntry,
+    appRow: number,
+  ) {
+    if (!accessToken || !data || !sheetId) {
+      throw new Error('Not connected to your sheet yet. Refresh the page and try again.')
+    }
+    setError(null)
+    setSaving(true)
+    try {
+      const token = await ensureFreshToken()
+      await updateLinkedAppRow({
+        spreadsheetId: sheetId,
+        accessToken: token,
+        year: selectedYear,
+        kind,
+        sheetRow: entry.sheetRow,
+        appRow,
+      })
+      const link = <T extends { sheetRow: number }>(list: T[]) =>
+        list.map((e) => (e.sheetRow === entry.sheetRow ? { ...e, appRow } : e))
+      setData((current) => {
+        if (!current) return current
+        switch (kind) {
+          case 'OA':
+            return { ...current, oaEntries: link(current.oaEntries) }
+          case 'HireVue':
+            return { ...current, hireVueEntries: link(current.hireVueEntries) }
+          case 'Interview':
+            return { ...current, interviewEntries: link(current.interviewEntries) }
+          case 'Screening':
+            return { ...current, screeningEntries: link(current.screeningEntries) }
+        }
+      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : `Could not link ${kind}`
+      setError(message)
+      throw err instanceof Error ? err : new Error(message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const linkedActions: LinkedActions = {
     addOa: (input) => handleAddAssessment('OA', input),
     addHireVue: (input) => handleAddAssessment('HireVue', input),
@@ -936,6 +982,7 @@ export default function App() {
     deleteHireVue: (entry) => handleDeleteAssessment('HireVue', entry),
     deleteInterview: handleDeleteInterview,
     deleteScreening: handleDeleteScreening,
+    linkEntry: handleLinkEntry,
   }
 
   async function handleSignOut() {

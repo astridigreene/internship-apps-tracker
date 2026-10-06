@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import type { AssessmentEntry, NewAssessmentInput } from '../types'
 import { formatDisplayDateTime, isExpired, parseSheetDate } from '../lib/time'
+import { DeleteButton, UnlinkedNote } from './EntryControls'
 
 interface AssessmentPanelProps {
   kind: 'OA' | 'HireVue'
@@ -10,6 +11,8 @@ interface AssessmentPanelProps {
   onAdd?: (input: NewAssessmentInput) => Promise<void>
   onToggleComplete?: (entry: AssessmentEntry, complete: boolean) => Promise<void>
   onDelete?: (entry: AssessmentEntry) => Promise<void>
+  /** Set this entry's App Row to the application being viewed. */
+  onLink?: (entry: AssessmentEntry) => Promise<void>
 }
 
 const EMPTY = (company: string): NewAssessmentInput => ({
@@ -29,6 +32,7 @@ export function AssessmentPanel({
   onAdd,
   onToggleComplete,
   onDelete,
+  onLink,
 }: AssessmentPanelProps) {
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState<NewAssessmentInput>(() => EMPTY(companyDefault ?? ''))
@@ -177,6 +181,9 @@ export function AssessmentPanel({
                       .filter(Boolean)
                       .join(' · ') || '—'}
                   </p>
+                  {entry.appRow === null && onLink ? (
+                    <UnlinkedNote disabled={disabled} onLink={() => onLink(entry)} />
+                  ) : null}
                 </div>
                 {onToggleComplete ? (
                   <button
@@ -197,15 +204,11 @@ export function AssessmentPanel({
                   </button>
                 ) : null}
                 {onDelete ? (
-                  <button
-                    type="button"
+                  <DeleteButton
+                    label={`Delete ${kind} entry`}
                     disabled={disabled}
-                    onClick={() => void onDelete(entry)}
-                    aria-label={`Delete ${kind} entry`}
-                    className="shrink-0 text-[11px] font-bold text-rose-600 hover:underline disabled:opacity-50 dark:text-rose-400"
-                  >
-                    Delete
-                  </button>
+                    onConfirm={() => onDelete(entry)}
+                  />
                 ) : null}
               </li>
             )

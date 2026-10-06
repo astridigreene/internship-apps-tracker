@@ -659,8 +659,9 @@ export async function fetchSheetValues(
   spreadsheetId: string,
   accessToken: string,
   sheetTitle: string,
+  cellRange?: string,
 ): Promise<string[][]> {
-  const range = a1RangeForSheet(sheetTitle)
+  const range = a1RangeForSheet(sheetTitle, cellRange)
   const url = new URL(
     `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(range)}`,
   )
@@ -1112,6 +1113,8 @@ async function appendRow(options: {
   accessToken: string
   sheetTitle: string
   row: string[]
+  /** A cell value (e.g. the company) that must be in the written row; checked by reading it back. */
+  verifyValue?: string
 }): Promise<number> {
   const range = a1RangeForSheet(options.sheetTitle, 'A:Z')
   const url = new URL(
@@ -1145,6 +1148,22 @@ async function appendRow(options: {
   const sheetRow = rowMatch ? Number(rowMatch[1]) : 0
   if (!sheetRow) {
     throw new Error('Added the row, but could not determine its sheet row number. Refresh and try again.')
+  }
+
+  if (options.verifyValue) {
+    const written = await fetchSheetValues(
+      options.spreadsheetId,
+      options.accessToken,
+      options.sheetTitle,
+      `A${sheetRow}:Z${sheetRow}`,
+    )
+    const expected = options.verifyValue.trim().toLowerCase()
+    const found = (written[0] ?? []).some((cell) => String(cell ?? '').trim().toLowerCase() === expected)
+    if (!found) {
+      throw new Error(
+        `Google Sheets accepted the new row, but it isn't in "${options.sheetTitle}" row ${sheetRow}. Refresh and check the tab before adding it again.`,
+      )
+    }
   }
   return sheetRow
 }
@@ -1258,6 +1277,7 @@ export async function appendAssessmentEntry(options: {
       [columns.complete, 'No'],
       [columns.appRow, appRow === null ? '' : String(appRow)],
     ]),
+    verifyValue: options.input.company,
   })
 
   return {
@@ -1306,6 +1326,7 @@ export async function appendInterviewEntry(options: {
       [columns.complete, 'No'],
       [columns.appRow, appRow === null ? '' : String(appRow)],
     ]),
+    verifyValue: options.input.company,
   })
 
   return {
@@ -1349,6 +1370,7 @@ export async function appendScreeningEntry(options: {
       [columns.notes, options.input.notes],
       [columns.appRow, appRow === null ? '' : String(appRow)],
     ]),
+    verifyValue: options.input.company,
   })
 
   return {
@@ -1358,6 +1380,58 @@ export async function appendScreeningEntry(options: {
     appRow,
     sheetRow,
   }
+}
+
+export type LinkedKind = 'OA' | 'HireVue' | 'Interview' | 'Screening'
+
+function linkedTabTitle(year: string, kind: LinkedKind): string {
+  const names = linkedTabNames(year)
+  switch (kind) {
+    case 'OA':
+      return names.oa
+    case 'HireVue':
+      return names.hireVue
+    case 'Interview':
+      return names.interviews
+    case 'Screening':
+      return names.screening
+  }
+}
+
+const DEFAULT_LINKED_HEADERS: Record<LinkedKind, string[]> = {
+  OA: ASSESSMENT_HEADER_ROW,
+  HireVue: ASSESSMENT_HEADER_ROW,
+  Interview: INTERVIEW_HEADER_ROW,
+  Screening: SCREENING_HEADER_ROW,
+}
+
+/** Set an existing linked entry's App Row (adding the column to the tab if needed). */
+export async function updateLinkedAppRow(options: {
+  spreadsheetId: string
+  accessToken: string
+  year: string
+  kind: LinkedKind
+  sheetRow: number
+  appRow: number
+}): Promise<void> {
+  const sheetTitle = linkedTabTitle(options.year, options.kind)
+  const headers = await prepareLinkedTab({
+    spreadsheetId: options.spreadsheetId,
+    accessToken: options.accessToken,
+    sheetTitle,
+    defaultHeader: DEFAULT_LINKED_HEADERS[options.kind],
+  })
+  const col = resolveColumnIndex(headerMapFor(headers), LINKED_HEADER_ALIASES.appRow)
+  if (col === undefined) {
+    throw missingHeadersError(sheetTitle, 'an App Row')
+  }
+  await putSheetValues({
+    spreadsheetId: options.spreadsheetId,
+    accessToken: options.accessToken,
+    sheetTitle,
+    startCell: `${columnLetter(col)}${options.sheetRow}`,
+    values: [[String(options.appRow)]],
+  })
 }
 
 /**

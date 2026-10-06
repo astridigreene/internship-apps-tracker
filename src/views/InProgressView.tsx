@@ -20,10 +20,13 @@ function nextPendingLabel(linked: ReturnType<typeof linkedEntriesForApplication>
       .map((e) => parseSheetDate(e.deadline))
       .filter((d): d is Date => d !== null)
       .sort((a, b) => a.getTime() - b.getTime())[0]
-    const kind = pendingAssessments[0]!.kind
-    return `${pendingAssessments.length} ${kind}${pendingAssessments.length === 1 ? '' : ' items'} pending${
-      soonest ? ` · ${formatDueInDays(soonest)}` : ''
-    }`
+    const oaCount = pendingAssessments.filter((e) => e.kind === 'OA').length
+    const hireVueCount = pendingAssessments.length - oaCount
+    const parts = [
+      oaCount ? `${oaCount} OA${oaCount === 1 ? '' : 's'}` : '',
+      hireVueCount ? `${hireVueCount} HireVue${hireVueCount === 1 ? '' : 's'}` : '',
+    ].filter(Boolean)
+    return `${parts.join(' + ')} pending${soonest ? ` · ${formatDueInDays(soonest)}` : ''}`
   }
   const pendingInterviews = linked.interviews.filter((e) => !e.complete)
   if (pendingInterviews.length > 0) {

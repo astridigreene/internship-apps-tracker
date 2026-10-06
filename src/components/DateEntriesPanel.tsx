@@ -1,5 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import type { InterviewEntry, NewInterviewInput, NewScreeningInput, ScreeningEntry } from '../types'
+import { parseSheetDate } from '../lib/time'
+import { DeleteButton, UnlinkedNote } from './EntryControls'
 
 type Entry = InterviewEntry | ScreeningEntry
 type Input = NewInterviewInput | NewScreeningInput
@@ -13,6 +15,8 @@ interface DateEntriesPanelProps<E extends Entry> {
   onAdd?: (input: Input) => Promise<void>
   onToggleComplete?: (entry: InterviewEntry, complete: boolean) => Promise<void>
   onDelete?: (entry: E) => Promise<void>
+  /** Set this entry's App Row to the application being viewed. */
+  onLink?: (entry: E) => Promise<void>
 }
 
 const EMPTY = (company: string): Input => ({ company, dateTime: '', notes: '' })
@@ -30,6 +34,7 @@ export function DateEntriesPanel<E extends Entry>({
   onAdd,
   onToggleComplete,
   onDelete,
+  onLink,
 }: DateEntriesPanelProps<E>) {
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState<Input>(() => EMPTY(companyDefault ?? ''))
@@ -37,8 +42,8 @@ export function DateEntriesPanel<E extends Entry>({
   const [submitting, setSubmitting] = useState(false)
 
   const sorted = [...entries].sort((a, b) => {
-    const at = Date.parse(a.dateTime)
-    const bt = Date.parse(b.dateTime)
+    const at = parseSheetDate(a.dateTime)?.getTime() ?? Number.NaN
+    const bt = parseSheetDate(b.dateTime)?.getTime() ?? Number.NaN
     if (Number.isNaN(at) && Number.isNaN(bt)) return 0
     if (Number.isNaN(at)) return 1
     if (Number.isNaN(bt)) return -1
@@ -139,6 +144,9 @@ export function DateEntriesPanel<E extends Entry>({
                 {entry.notes ? (
                   <p className="truncate text-[11px] text-app-text-weak">{entry.notes}</p>
                 ) : null}
+                {entry.appRow === null && onLink ? (
+                  <UnlinkedNote disabled={disabled} onLink={() => onLink(entry)} />
+                ) : null}
               </div>
               {showComplete && hasComplete(entry) && onToggleComplete ? (
                 <button
@@ -156,15 +164,11 @@ export function DateEntriesPanel<E extends Entry>({
                 </button>
               ) : null}
               {onDelete ? (
-                <button
-                  type="button"
+                <DeleteButton
+                  label={`Delete ${kind} entry`}
                   disabled={disabled}
-                  onClick={() => void onDelete(entry)}
-                  aria-label={`Delete ${kind} entry`}
-                  className="shrink-0 text-[11px] font-bold text-rose-600 hover:underline disabled:opacity-50 dark:text-rose-400"
-                >
-                  Delete
-                </button>
+                  onConfirm={() => onDelete(entry)}
+                />
               ) : null}
             </li>
           ))}

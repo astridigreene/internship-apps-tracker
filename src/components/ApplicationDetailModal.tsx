@@ -275,6 +275,7 @@ export function ApplicationDetailModal({
                     : undefined
                 }
                 onDelete={linkedActions ? (entry) => linkedActions.deleteOa(entry) : undefined}
+                onLink={linkedActions ? (entry) => linkedActions.linkEntry('OA', entry, app.sheetRow) : undefined}
               />
               <AssessmentPanel
                 kind="HireVue"
@@ -288,6 +289,7 @@ export function ApplicationDetailModal({
                     : undefined
                 }
                 onDelete={linkedActions ? (entry) => linkedActions.deleteHireVue(entry) : undefined}
+                onLink={linkedActions ? (entry) => linkedActions.linkEntry('HireVue', entry, app.sheetRow) : undefined}
               />
               <DateEntriesPanel
                 kind="Screening"
@@ -297,6 +299,7 @@ export function ApplicationDetailModal({
                 showComplete={false}
                 onAdd={linkedActions ? (input) => linkedActions.addScreening({ ...input, appRow: app.sheetRow }) : undefined}
                 onDelete={linkedActions ? (entry) => linkedActions.deleteScreening(entry) : undefined}
+                onLink={linkedActions ? (entry) => linkedActions.linkEntry('Screening', entry, app.sheetRow) : undefined}
               />
               <DateEntriesPanel
                 kind="Interview"
@@ -311,6 +314,7 @@ export function ApplicationDetailModal({
                     : undefined
                 }
                 onDelete={linkedActions ? (entry) => linkedActions.deleteInterview(entry) : undefined}
+                onLink={linkedActions ? (entry) => linkedActions.linkEntry('Interview', entry, app.sheetRow) : undefined}
               />
             </div>
           ) : null}
