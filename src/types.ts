@@ -339,6 +339,9 @@ export interface LinkedActions {
   deleteHireVue: (entry: AssessmentEntry) => Promise<void>
   deleteInterview: (entry: InterviewEntry) => Promise<void>
   deleteScreening: (entry: ScreeningEntry) => Promise<void>
+  editAssessment: (entry: AssessmentEntry, input: NewAssessmentInput) => Promise<void>
+  editInterview: (entry: InterviewEntry, input: NewInterviewInput) => Promise<void>
+  editScreening: (entry: ScreeningEntry, input: NewScreeningInput) => Promise<void>
   /** Point an existing entry's App Row at an application's year-tab row. */
   linkEntry: (
     kind: 'OA' | 'HireVue' | 'Interview' | 'Screening',

@@ -3,7 +3,7 @@ import type { Application, ApplicationStatus, LinkedActions, TrackerData } from 
 import { StatusPill } from '../components/StatusPill'
 import { ApplicationDetailModal } from '../components/ApplicationDetailModal'
 import { linkedEntriesForApplication } from '../lib/sheet'
-import { formatDueInDays, parseSheetDate } from '../lib/time'
+import { endMoment, formatDueInDays, isExpired, parseSheetDate } from '../lib/time'
 import type { StatusEditChange } from './ApplicationsView'
 
 interface InProgressViewProps {
@@ -38,17 +38,47 @@ function nextPendingLabel(linked: ReturnType<typeof linkedEntriesForApplication>
   return null
 }
 
+/**
+ * When the application's next still-upcoming item happens: an incomplete OA/HireVue
+ * deadline that hasn't passed, or an interview/screening that hasn't ended yet.
+ * Null when there's nothing coming up.
+ */
+function nextUpcomingTime(linked: ReturnType<typeof linkedEntriesForApplication>, now: Date): number | null {
+  const times: number[] = []
+  for (const entry of [...linked.oa, ...linked.hireVue]) {
+    const deadline = parseSheetDate(entry.deadline)
+    if (!entry.complete && deadline && !isExpired(deadline, now)) {
+      times.push(deadline.getTime())
+    }
+  }
+  for (const entry of [...linked.interviews.filter((e) => !e.complete), ...linked.screenings]) {
+    const start = parseSheetDate(entry.dateTime)
+    if (start && !isExpired(endMoment(start, entry.endTime) ?? start, now)) {
+      times.push(start.getTime())
+    }
+  }
+  return times.length ? Math.min(...times) : null
+}
+
 export function InProgressView({ data, saving, onSaveStatusChanges, linkedActions }: InProgressViewProps) {
   const [detailApp, setDetailApp] = useState<Application | null>(null)
 
-  const inProgress = useMemo(
-    () =>
-      data.applications
-        .filter((app) => app.status === 'Progressed' || app.status === 'Interview')
-        .slice()
-        .sort((a, b) => a.company.localeCompare(b.company)),
-    [data.applications],
-  )
+  // Soonest upcoming deadline/event first; applications with nothing coming up go last, by company.
+  const inProgress = useMemo(() => {
+    const now = new Date()
+    return data.applications
+      .filter((app) => app.status === 'Progressed' || app.status === 'Interview')
+      .map((app) => ({ app, next: nextUpcomingTime(linkedEntriesForApplication(data, app, data.applications), now) }))
+      .sort((a, b) => {
+        if (a.next !== b.next) {
+          if (a.next === null) return 1
+          if (b.next === null) return -1
+          return a.next - b.next
+        }
+        return a.app.company.localeCompare(b.app.company)
+      })
+      .map(({ app }) => app)
+  }, [data])
 
   const detailAppLive =
     detailApp === null

@@ -248,6 +248,18 @@ export function toDateInputValue(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
 }
 
+/** Local date-time as YYYY-MM-DDTHH:MM (for `<input type="datetime-local">`). */
+export function toDateTimeInputValue(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${toDateInputValue(date)}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+/** Minutes after midnight as HH:MM (for `<input type="time">`). */
+export function toTimeInputValue(minutes: number): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`
+}
+
 /** Midnight local time for a Date or YYYY-MM-DD string. */
 export function startOfDay(value: Date | string): Date {
   if (typeof value === 'string') {

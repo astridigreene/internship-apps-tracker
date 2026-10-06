@@ -1498,22 +1498,144 @@ export async function shiftLinkedAppRows(options: {
   }
 
   if (!data.length) return
+  await batchPutValues(options.spreadsheetId, options.accessToken, data, 'Could not update App Row references')
+}
 
+/** Write several (possibly non-adjacent) ranges in one values:batchUpdate call. */
+async function batchPutValues(
+  spreadsheetId: string,
+  accessToken: string,
+  data: { range: string; values: string[][] }[],
+  failureMessage: string,
+): Promise<void> {
   const res = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(options.spreadsheetId)}/values:batchUpdate`,
+    `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values:batchUpdate`,
     {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${options.accessToken}`,
+        Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ valueInputOption: 'USER_ENTERED', data }),
     },
   )
+  if (res.status === 401 || res.status === 403) {
+    throw new Error(
+      'Could not update the sheet. Sign out and sign in again to grant edit access to Google Sheets.',
+    )
+  }
   if (!res.ok) {
     const body = await res.text()
-    throw new Error(`Could not update App Row references (${res.status}): ${body.slice(0, 200)}`)
+    throw new Error(`${failureMessage} (${res.status}): ${body.slice(0, 200)}`)
   }
+}
+
+/** Write the given cells of one row (skipping columns the tab doesn't have). */
+async function putRowCells(options: {
+  spreadsheetId: string
+  accessToken: string
+  sheetTitle: string
+  sheetRow: number
+  cells: [number | null, string][]
+}): Promise<void> {
+  const data = options.cells
+    .filter((cell): cell is [number, string] => cell[0] !== null)
+    .map(([col, value]) => ({
+      range: a1RangeForSheet(options.sheetTitle, `${columnLetter(col)}${options.sheetRow}`),
+      values: [[value]],
+    }))
+  if (!data.length) return
+  await batchPutValues(options.spreadsheetId, options.accessToken, data, 'Could not save your changes')
+}
+
+/** Overwrite an OA/HireVue entry's details (Complete and App Row are left alone). */
+export async function updateAssessmentEntry(options: {
+  spreadsheetId: string
+  accessToken: string
+  year: string
+  entry: AssessmentEntry
+  input: NewAssessmentInput
+}): Promise<AssessmentEntry> {
+  const { kind } = options.entry
+  const sheetTitle = linkedTabTitle(options.year, kind)
+  const headers = await prepareLinkedTab({
+    spreadsheetId: options.spreadsheetId,
+    accessToken: options.accessToken,
+    sheetTitle,
+    defaultHeader: ASSESSMENT_HEADER_ROW,
+  })
+  const { columns } = parseAssessmentSheet([headers], kind)
+  if (!columns) {
+    throw missingHeadersError(sheetTitle, 'Company and Deadline')
+  }
+
+  const deadline = formatSheetDateTime(options.input.deadline) || options.input.deadline
+  const dateOffered = formatDisplayDate(options.input.dateOffered) || options.input.dateOffered
+  await putRowCells({
+    spreadsheetId: options.spreadsheetId,
+    accessToken: options.accessToken,
+    sheetTitle,
+    sheetRow: options.entry.sheetRow,
+    cells: [
+      [columns.deadline, deadline],
+      [columns.auto, formatYesNo(options.input.auto)],
+      [columns.company, options.input.company],
+      [columns.dateOffered, dateOffered],
+      [columns.lengthMinutes, options.input.lengthMinutes],
+      [columns.site, options.input.site],
+    ],
+  })
+
+  return {
+    ...options.entry,
+    company: options.input.company,
+    deadline,
+    auto: options.input.auto,
+    dateOffered,
+    lengthMinutes: options.input.lengthMinutes,
+    site: options.input.site,
+  }
+}
+
+/** Overwrite an interview/screening entry's details (Complete and App Row are left alone). */
+export async function updateDateEntry<E extends InterviewEntry | ScreeningEntry>(options: {
+  spreadsheetId: string
+  accessToken: string
+  year: string
+  kind: 'Interview' | 'Screening'
+  entry: E
+  input: NewInterviewInput | NewScreeningInput
+}): Promise<E> {
+  const sheetTitle = linkedTabTitle(options.year, options.kind)
+  const headers = await prepareLinkedTab({
+    spreadsheetId: options.spreadsheetId,
+    accessToken: options.accessToken,
+    sheetTitle,
+    defaultHeader: DEFAULT_LINKED_HEADERS[options.kind],
+    addHeaders: ['endTime'],
+  })
+  const columns =
+    options.kind === 'Interview' ? parseInterviewSheet([headers]).columns : parseScreeningSheet([headers]).columns
+  if (!columns) {
+    throw missingHeadersError(sheetTitle, 'Company and Date & Time')
+  }
+
+  const dateTime = formatSheetDateTime(options.input.dateTime) || options.input.dateTime
+  const endTime = formatEndTime(options.input.endTime)
+  await putRowCells({
+    spreadsheetId: options.spreadsheetId,
+    accessToken: options.accessToken,
+    sheetTitle,
+    sheetRow: options.entry.sheetRow,
+    cells: [
+      [columns.company, options.input.company],
+      [columns.dateTime, dateTime],
+      [columns.endTime, endTime],
+      [columns.notes, options.input.notes],
+    ],
+  })
+
+  return { ...options.entry, company: options.input.company, dateTime, endTime, notes: options.input.notes }
 }
 
 /** Local-state version of shiftLinkedAppRows. */

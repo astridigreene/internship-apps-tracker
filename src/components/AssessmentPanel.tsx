@@ -1,6 +1,12 @@
 import { useState, type FormEvent } from 'react'
 import type { AssessmentEntry, NewAssessmentInput } from '../types'
-import { formatDisplayDateTime, isExpired, parseSheetDate } from '../lib/time'
+import {
+  formatDisplayDateTime,
+  isExpired,
+  parseSheetDate,
+  toDateInputValue,
+  toDateTimeInputValue,
+} from '../lib/time'
 import { DeleteButton, UnlinkedNote } from './EntryControls'
 
 interface AssessmentPanelProps {
@@ -13,6 +19,7 @@ interface AssessmentPanelProps {
   onDelete?: (entry: AssessmentEntry) => Promise<void>
   /** Set this entry's App Row to the application being viewed. */
   onLink?: (entry: AssessmentEntry) => Promise<void>
+  onEdit?: (entry: AssessmentEntry, input: NewAssessmentInput) => Promise<void>
 }
 
 const EMPTY = (company: string): NewAssessmentInput => ({
@@ -24,6 +31,20 @@ const EMPTY = (company: string): NewAssessmentInput => ({
   site: '',
 })
 
+/** An entry's sheet values in the shapes the form inputs expect. */
+function formFromEntry(entry: AssessmentEntry): NewAssessmentInput {
+  const deadline = parseSheetDate(entry.deadline)
+  const offered = parseSheetDate(entry.dateOffered)
+  return {
+    company: entry.company,
+    deadline: deadline ? toDateTimeInputValue(deadline) : entry.deadline,
+    auto: entry.auto,
+    dateOffered: offered ? toDateInputValue(offered) : entry.dateOffered,
+    lengthMinutes: entry.lengthMinutes,
+    site: entry.site,
+  }
+}
+
 export function AssessmentPanel({
   kind,
   entries,
@@ -33,8 +54,10 @@ export function AssessmentPanel({
   onToggleComplete,
   onDelete,
   onLink,
+  onEdit,
 }: AssessmentPanelProps) {
   const [adding, setAdding] = useState(false)
+  const [editing, setEditing] = useState<AssessmentEntry | null>(null)
   const [form, setForm] = useState<NewAssessmentInput>(() => EMPTY(companyDefault ?? ''))
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -51,9 +74,24 @@ export function AssessmentPanel({
     return at - bt
   })
 
+  function closeForm() {
+    setAdding(false)
+    setEditing(null)
+    setError(null)
+    setForm(EMPTY(companyDefault ?? ''))
+  }
+
+  function startEdit(entry: AssessmentEntry) {
+    setAdding(false)
+    setEditing(entry)
+    setError(null)
+    setForm(formFromEntry(entry))
+  }
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
-    if (!onAdd) return
+    const save = editing ? onEdit && ((input: NewAssessmentInput) => onEdit(editing, input)) : onAdd
+    if (!save) return
     if (!form.company.trim() || !form.deadline.trim()) {
       setError('Company and Deadline are required.')
       return
@@ -61,11 +99,10 @@ export function AssessmentPanel({
     setSubmitting(true)
     setError(null)
     try {
-      await onAdd(form)
-      setForm(EMPTY(companyDefault ?? ''))
-      setAdding(false)
+      await save(form)
+      closeForm()
     } catch (err) {
-      setError(err instanceof Error ? err.message : `Could not add ${kind}`)
+      setError(err instanceof Error ? err.message : `Could not save ${kind}`)
     } finally {
       setSubmitting(false)
     }
@@ -73,6 +110,84 @@ export function AssessmentPanel({
 
   const fieldClass =
     'h-8 w-full rounded border border-app-border bg-app-surface px-2 text-[12px] font-semibold text-app-text outline-none focus:border-app-brand'
+
+  const formJsx = (
+    <form onSubmit={handleSubmit} className="space-y-2 border-b border-app-border px-2.5 py-2">
+      {!companyDefault ? (
+        <input
+          placeholder="Company"
+          required
+          value={form.company}
+          onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))}
+          className={fieldClass}
+        />
+      ) : null}
+      <div className="grid grid-cols-2 gap-1.5">
+        <label className="col-span-2 text-[10px] font-bold uppercase text-app-text-weak">
+          Deadline (date &amp; time)
+          <input
+            type="datetime-local"
+            required
+            value={form.deadline}
+            onChange={(e) => setForm((f) => ({ ...f, deadline: e.target.value }))}
+            className={fieldClass}
+          />
+        </label>
+        <label className="text-[10px] font-bold uppercase text-app-text-weak">
+          Date Offered
+          <input
+            type="date"
+            value={form.dateOffered}
+            onChange={(e) => setForm((f) => ({ ...f, dateOffered: e.target.value }))}
+            className={fieldClass}
+          />
+        </label>
+        <label className="text-[10px] font-bold uppercase text-app-text-weak">
+          Length (minutes)
+          <input
+            inputMode="numeric"
+            value={form.lengthMinutes}
+            onChange={(e) => setForm((f) => ({ ...f, lengthMinutes: e.target.value }))}
+            className={fieldClass}
+          />
+        </label>
+        <label className="text-[10px] font-bold uppercase text-app-text-weak">
+          Site
+          <input
+            value={form.site}
+            onChange={(e) => setForm((f) => ({ ...f, site: e.target.value }))}
+            className={fieldClass}
+          />
+        </label>
+      </div>
+      <label className="flex items-center gap-1.5 text-[11px] font-semibold text-app-text">
+        <input
+          type="checkbox"
+          checked={form.auto}
+          onChange={(e) => setForm((f) => ({ ...f, auto: e.target.checked }))}
+          className="accent-app-brand"
+        />
+        Auto
+      </label>
+      {error ? <p className="text-[11px] font-semibold text-kpi-reject-text">{error}</p> : null}
+      {editing ? (
+        <button
+          type="button"
+          onClick={closeForm}
+          className="h-8 w-full rounded border border-app-border text-[12px] font-bold text-app-text hover:bg-app-hover"
+        >
+          Cancel
+        </button>
+      ) : null}
+      <button
+        type="submit"
+        disabled={submitting}
+        className="h-8 w-full rounded bg-app-brand text-[12px] font-bold text-white hover:bg-app-brand-dark disabled:opacity-50 dark:text-teal-950"
+      >
+        {submitting ? 'Saving…' : editing ? 'Save changes' : `Save ${kind}`}
+      </button>
+    </form>
+  )
 
   return (
     <div className="rounded-md border border-app-border">
@@ -84,7 +199,11 @@ export function AssessmentPanel({
           <button
             type="button"
             disabled={disabled}
-            onClick={() => setAdding((v) => !v)}
+            onClick={() => {
+              const wasAdding = adding
+              closeForm()
+              setAdding(!wasAdding)
+            }}
             className="text-[11px] font-bold text-app-brand hover:underline disabled:opacity-50"
           >
             {adding ? 'Cancel' : `+ Add ${kind}`}
@@ -92,80 +211,16 @@ export function AssessmentPanel({
         ) : null}
       </div>
 
-      {adding ? (
-        <form onSubmit={handleSubmit} className="space-y-2 border-b border-app-border px-2.5 py-2">
-          {!companyDefault ? (
-            <input
-              placeholder="Company"
-              required
-              value={form.company}
-              onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))}
-              className={fieldClass}
-            />
-          ) : null}
-          <div className="grid grid-cols-2 gap-1.5">
-            <label className="col-span-2 text-[10px] font-bold uppercase text-app-text-weak">
-              Deadline (date &amp; time)
-              <input
-                type="datetime-local"
-                required
-                value={form.deadline}
-                onChange={(e) => setForm((f) => ({ ...f, deadline: e.target.value }))}
-                className={fieldClass}
-              />
-            </label>
-            <label className="text-[10px] font-bold uppercase text-app-text-weak">
-              Date Offered
-              <input
-                type="date"
-                value={form.dateOffered}
-                onChange={(e) => setForm((f) => ({ ...f, dateOffered: e.target.value }))}
-                className={fieldClass}
-              />
-            </label>
-            <label className="text-[10px] font-bold uppercase text-app-text-weak">
-              Length (minutes)
-              <input
-                inputMode="numeric"
-                value={form.lengthMinutes}
-                onChange={(e) => setForm((f) => ({ ...f, lengthMinutes: e.target.value }))}
-                className={fieldClass}
-              />
-            </label>
-            <label className="text-[10px] font-bold uppercase text-app-text-weak">
-              Site
-              <input
-                value={form.site}
-                onChange={(e) => setForm((f) => ({ ...f, site: e.target.value }))}
-                className={fieldClass}
-              />
-            </label>
-          </div>
-          <label className="flex items-center gap-1.5 text-[11px] font-semibold text-app-text">
-            <input
-              type="checkbox"
-              checked={form.auto}
-              onChange={(e) => setForm((f) => ({ ...f, auto: e.target.checked }))}
-              className="accent-app-brand"
-            />
-            Auto
-          </label>
-          {error ? <p className="text-[11px] font-semibold text-kpi-reject-text">{error}</p> : null}
-          <button
-            type="submit"
-            disabled={submitting}
-            className="h-8 w-full rounded bg-app-brand text-[12px] font-bold text-white hover:bg-app-brand-dark disabled:opacity-50 dark:text-teal-950"
-          >
-            {submitting ? 'Saving…' : `Save ${kind}`}
-          </button>
-        </form>
-      ) : null}
+      {adding ? formJsx : null}
 
       {sorted.length === 0 ? (
         <p className="px-2.5 py-2.5 text-[12px] text-app-text-weak">No {kind} entries yet.</p>
       ) : (
         <ul className="divide-y divide-app-border">
           {sorted.map((entry) => {
+            if (editing?.sheetRow === entry.sheetRow) {
+              return <li key={entry.sheetRow}>{formJsx}</li>
+            }
             const expired = !entry.complete && isExpired(parseSheetDate(entry.deadline))
             return (
               <li key={entry.sheetRow} className="flex items-center gap-2 px-2.5 py-2">
@@ -201,6 +256,17 @@ export function AssessmentPanel({
                     ].join(' ')}
                   >
                     {entry.complete ? 'Complete' : expired ? 'Expired' : 'Pending'}
+                  </button>
+                ) : null}
+                {onEdit ? (
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => startEdit(entry)}
+                    aria-label={`Edit ${kind} entry`}
+                    className="shrink-0 text-[11px] font-bold text-app-brand hover:underline disabled:opacity-50"
+                  >
+                    Edit
                   </button>
                 ) : null}
                 {onDelete ? (

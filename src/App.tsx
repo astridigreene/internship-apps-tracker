@@ -41,6 +41,8 @@ import {
   SheetSetupError,
   shiftAppRowAfterDelete,
   shiftLinkedAppRows,
+  updateAssessmentEntry,
+  updateDateEntry,
   updateLinkedAppRow,
   updateLinkedComplete,
   type LinkedKind,
@@ -970,6 +972,77 @@ export default function App() {
     }
   }
 
+  /** Run a linked-entry edit against the sheet, then swap the saved entry into local state. */
+  async function runLinkedEdit<E extends { sheetRow: number }>(
+    label: string,
+    save: (token: string) => Promise<E>,
+    apply: (current: TrackerData, saved: E) => TrackerData,
+  ) {
+    if (!accessToken || !data || !sheetId) {
+      throw new Error('Not connected to your sheet yet. Refresh the page and try again.')
+    }
+    setError(null)
+    setSaving(true)
+    try {
+      const token = await ensureFreshToken()
+      const saved = await save(token)
+      setData((current) => (current ? apply(current, saved) : current))
+    } catch (err) {
+      const message = err instanceof Error ? err.message : `Could not save ${label}`
+      setError(message)
+      throw err instanceof Error ? err : new Error(message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const replaceRow = <T extends { sheetRow: number }>(list: T[], saved: T) =>
+    list.map((e) => (e.sheetRow === saved.sheetRow ? saved : e))
+
+  function handleEditAssessment(entry: AssessmentEntry, input: NewAssessmentInput) {
+    return runLinkedEdit(
+      entry.kind,
+      (token) =>
+        updateAssessmentEntry({ spreadsheetId: sheetId!, accessToken: token, year: selectedYear, entry, input }),
+      (current, saved) =>
+        saved.kind === 'OA'
+          ? { ...current, oaEntries: replaceRow(current.oaEntries, saved) }
+          : { ...current, hireVueEntries: replaceRow(current.hireVueEntries, saved) },
+    )
+  }
+
+  function handleEditInterview(entry: InterviewEntry, input: NewInterviewInput) {
+    return runLinkedEdit(
+      'interview',
+      (token) =>
+        updateDateEntry({
+          spreadsheetId: sheetId!,
+          accessToken: token,
+          year: selectedYear,
+          kind: 'Interview',
+          entry,
+          input,
+        }),
+      (current, saved) => ({ ...current, interviewEntries: replaceRow(current.interviewEntries, saved) }),
+    )
+  }
+
+  function handleEditScreening(entry: ScreeningEntry, input: NewScreeningInput) {
+    return runLinkedEdit(
+      'screening',
+      (token) =>
+        updateDateEntry({
+          spreadsheetId: sheetId!,
+          accessToken: token,
+          year: selectedYear,
+          kind: 'Screening',
+          entry,
+          input,
+        }),
+      (current, saved) => ({ ...current, screeningEntries: replaceRow(current.screeningEntries, saved) }),
+    )
+  }
+
   const linkedActions: LinkedActions = {
     addOa: (input) => handleAddAssessment('OA', input),
     addHireVue: (input) => handleAddAssessment('HireVue', input),
@@ -983,6 +1056,9 @@ export default function App() {
     deleteInterview: handleDeleteInterview,
     deleteScreening: handleDeleteScreening,
     linkEntry: handleLinkEntry,
+    editAssessment: handleEditAssessment,
+    editInterview: handleEditInterview,
+    editScreening: handleEditScreening,
   }
 
   async function handleSignOut() {
