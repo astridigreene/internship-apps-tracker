@@ -39,8 +39,8 @@ export function AssessmentPanel({
     if (a.complete !== b.complete) {
       return a.complete ? 1 : -1
     }
-    const at = Date.parse(a.deadline)
-    const bt = Date.parse(b.deadline)
+    const at = parseSheetDate(a.deadline)?.getTime() ?? Number.NaN
+    const bt = parseSheetDate(b.deadline)?.getTime() ?? Number.NaN
     if (Number.isNaN(at) && Number.isNaN(bt)) return 0
     if (Number.isNaN(at)) return 1
     if (Number.isNaN(bt)) return -1

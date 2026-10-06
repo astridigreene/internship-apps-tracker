@@ -85,19 +85,28 @@ export function parseSheetDate(value: string): Date | null {
 
   const asNumber = Number(raw)
   if (!Number.isNaN(asNumber) && asNumber > 20_000 && asNumber < 100_000) {
-    // Sheets serial date (days since 1899-12-30)
-    const ms = Date.UTC(1899, 11, 30) + asNumber * 86_400_000
-    return new Date(ms)
+    // Sheets serial date (days since 1899-12-30, local time — not UTC, which would
+    // land a bare date at 8 PM the day before in US time zones)
+    const days = Math.floor(asNumber)
+    const seconds = Math.round((asNumber - days) * 86_400)
+    return new Date(1899, 11, 30 + days, 0, 0, seconds)
   }
 
-  // Prefer M/D/YYYY (with optional time) over locale-ambiguous Date parsing
+  // Prefer M/D/YYYY (with optional time) over locale-ambiguous Date parsing. Sheets
+  // shows a date typed without a year (e.g. "10/8") as just M/D — that's this year,
+  // not 2001, which is what `new Date('10/8')` would give.
   const mdy = raw.match(
-    /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?)?/i,
+    /^(\d{1,2})\/(\d{1,2})(?:\/(\d{4}|\d{2}))?(?:,?\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?)?/i,
   )
   if (mdy) {
     const month = Number(mdy[1]) - 1
     const day = Number(mdy[2])
-    const year = Number(mdy[3])
+    const year =
+      mdy[3] === undefined
+        ? new Date().getFullYear()
+        : mdy[3].length === 2
+          ? 2000 + Number(mdy[3])
+          : Number(mdy[3])
     let hours = mdy[4] !== undefined ? Number(mdy[4]) : 0
     const minutes = mdy[5] !== undefined ? Number(mdy[5]) : 0
     const seconds = mdy[6] !== undefined ? Number(mdy[6]) : 0
@@ -123,7 +132,14 @@ export function parseSheetDate(value: string): Date | null {
   }
 
   const parsed = new Date(raw)
-  return Number.isNaN(parsed.getTime()) ? null : parsed
+  if (Number.isNaN(parsed.getTime())) {
+    return null
+  }
+  // Same year-less problem for text like "Oct 8": JS fills in 2001.
+  if (!/\d{4}/.test(raw)) {
+    parsed.setFullYear(new Date().getFullYear())
+  }
+  return parsed
 }
 
 /** Display / sheet dates as M/D/YYYY (e.g. 7/19/2026). */
