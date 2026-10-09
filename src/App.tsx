@@ -34,6 +34,7 @@ import {
   fetchLinkedTrackerData,
   fetchSheetValues,
   isSheetSetupError,
+  linkedApplicationFor,
   linkedTabNames,
   listYearSheets,
   nextSummerYear,
@@ -41,6 +42,7 @@ import {
   SheetSetupError,
   shiftAppRowAfterDelete,
   shiftLinkedAppRows,
+  updateAssessmentCalendarEvent,
   updateAssessmentEntry,
   updateDateEntry,
   updateLinkedAppRow,
@@ -48,7 +50,13 @@ import {
   type LinkedKind,
   updateSheetStatus,
 } from './lib/sheet'
-import { statusUpdateStamp } from './lib/time'
+import { formatDisplayDateTime, parseSheetDate, statusUpdateStamp } from './lib/time'
+import {
+  createCalendarEvent,
+  deleteCalendarEvent,
+  updateCalendarEvent,
+  type CalendarEventInput,
+} from './lib/calendar'
 import { celebrate } from './lib/celebrate'
 import { pingGithubActivity } from './lib/githubPing'
 import {
@@ -71,6 +79,7 @@ import { SheetSetupHelp } from './components/SheetSetupHelp'
 import { YearTabs } from './components/YearTabs'
 import { DashboardView } from './views/DashboardView'
 import { InProgressView } from './views/InProgressView'
+import { CalendarView } from './views/CalendarView'
 import {
   ApplicationsView,
   type ApplicationsStatusFilter,
@@ -676,6 +685,73 @@ export default function App() {
       .map((entry) => (entry.sheetRow > deletedRow ? { ...entry, sheetRow: entry.sheetRow - 1 } : entry))
   }
 
+  /** The calendar invite for an OA/HireVue entry's scheduled time. */
+  function calendarEventFor(entry: AssessmentEntry, start: Date): CalendarEventInput {
+    const app = data ? linkedApplicationFor(entry, data.applications) : undefined
+    const length = Number(entry.lengthMinutes)
+    return {
+      summary: `Do ${entry.kind}: ${entry.company}${app?.role ? ` (${app.role})` : ''}`,
+      description: [
+        `Deadline: ${formatDisplayDateTime(entry.deadline) || entry.deadline || '—'}`,
+        entry.lengthMinutes ? `Length: ${entry.lengthMinutes} min` : '',
+        entry.site ? `Site: ${entry.site}` : '',
+        '',
+        'Scheduled from Internship Tracker.',
+      ]
+        .filter((line, i, lines) => line || lines[i + 1])
+        .join('\n'),
+      start,
+      durationMinutes: Number.isFinite(length) && length > 0 ? length : 60,
+      attendeeEmail: config.calendarInviteEmail || user?.email || '',
+    }
+  }
+
+  /**
+   * Bring an OA/HireVue entry's calendar invite in line with its Scheduled For
+   * time — create or update it when scheduled, remove it when cleared — and
+   * record the event ID on the sheet. A failure shows in the error banner but
+   * doesn't undo the sheet save that came before it.
+   */
+  async function syncAssessmentCalendar(token: string, entry: AssessmentEntry): Promise<AssessmentEntry> {
+    const start = parseSheetDate(entry.scheduled)
+    let eventId: string
+    try {
+      if (start) {
+        const input = calendarEventFor(entry, start)
+        eventId = entry.calendarEventId
+          ? await updateCalendarEvent(token, entry.calendarEventId, input)
+          : await createCalendarEvent(token, input)
+      } else {
+        if (entry.calendarEventId) {
+          await deleteCalendarEvent(token, entry.calendarEventId)
+        }
+        eventId = ''
+      }
+    } catch (err) {
+      setError(`Saved the ${entry.kind}, but ${err instanceof Error ? err.message : String(err)}`)
+      return entry
+    }
+    const synced = { ...entry, calendarEventId: eventId }
+    if (eventId !== entry.calendarEventId) {
+      try {
+        await updateAssessmentCalendarEvent({
+          spreadsheetId: sheetId!,
+          accessToken: token,
+          year: selectedYear,
+          entry,
+          eventId,
+        })
+      } catch (err) {
+        setError(
+          `Updated the calendar invite, but couldn't record it on the sheet: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        )
+      }
+    }
+    return synced
+  }
+
   async function handleAddAssessment(kind: 'OA' | 'HireVue', input: NewAssessmentInput) {
     if (!accessToken || !data || !sheetId) {
       throw new Error('Not connected to your sheet yet. Refresh the page and try again.')
@@ -684,13 +760,14 @@ export default function App() {
     setSaving(true)
     try {
       const token = await ensureFreshToken()
-      const entry = await appendAssessmentEntry({
+      const appended = await appendAssessmentEntry({
         spreadsheetId: sheetId,
         accessToken: token,
         year: selectedYear,
         kind,
         input,
       })
+      const entry = appended.scheduled ? await syncAssessmentCalendar(token, appended) : appended
       setData((current) => {
         if (!current) return current
         return kind === 'OA'
@@ -863,6 +940,13 @@ export default function App() {
           ? { ...current, oaEntries: shiftRowsAfterDelete(current.oaEntries, entry.sheetRow) }
           : { ...current, hireVueEntries: shiftRowsAfterDelete(current.hireVueEntries, entry.sheetRow) }
       })
+      if (entry.calendarEventId) {
+        await deleteCalendarEvent(token, entry.calendarEventId).catch((err: unknown) => {
+          setError(
+            `Deleted the ${kind}, but ${err instanceof Error ? err.message : String(err)}`,
+          )
+        })
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : `Could not delete ${kind}`
       setError(message)
@@ -1002,8 +1086,22 @@ export default function App() {
   function handleEditAssessment(entry: AssessmentEntry, input: NewAssessmentInput) {
     return runLinkedEdit(
       entry.kind,
-      (token) =>
-        updateAssessmentEntry({ spreadsheetId: sheetId!, accessToken: token, year: selectedYear, entry, input }),
+      async (token) => {
+        const saved = await updateAssessmentEntry({
+          spreadsheetId: sheetId!,
+          accessToken: token,
+          year: selectedYear,
+          entry,
+          input,
+        })
+        // Only touch the invite when something it shows changed (each update re-sends it),
+        // or when a scheduled time never got one (e.g. an earlier attempt failed).
+        const inviteFields = (e: AssessmentEntry) =>
+          [e.scheduled, e.company, e.deadline, e.lengthMinutes, e.site].join('\u0000')
+        const needsSync =
+          inviteFields(saved) !== inviteFields(entry) || (saved.scheduled !== '' && !saved.calendarEventId)
+        return needsSync ? syncAssessmentCalendar(token, saved) : saved
+      },
       (current, saved) =>
         saved.kind === 'OA'
           ? { ...current, oaEntries: replaceRow(current.oaEntries, saved) }
@@ -1199,6 +1297,15 @@ export default function App() {
               onAddApplication={handleAddApplication}
               onDeleteApplication={handleDeleteApplication}
               linkedData={data}
+              linkedActions={linkedActions}
+            />
+          </div>
+        ) : view === 'calendar' ? (
+          <div className="flex flex-1 flex-col lg:min-h-0">
+            <CalendarView
+              data={data}
+              saving={saving}
+              onSaveStatusChanges={handleSaveStatusChanges}
               linkedActions={linkedActions}
             />
           </div>

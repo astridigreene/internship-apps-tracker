@@ -1,8 +1,10 @@
 const GIS_SRC = 'https://accounts.google.com/gsi/client'
 // Full Sheets scope so dashboard can update Status cells
 const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets'
+// Create/update/delete the calendar invites for scheduled OA/HireVue times
+const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events'
 const PROFILE_SCOPES = 'openid email profile'
-const SCOPES = `${SHEETS_SCOPE} ${PROFILE_SCOPES}`
+const SCOPES = `${SHEETS_SCOPE} ${CALENDAR_SCOPE} ${PROFILE_SCOPES}`
 
 let gisLoadPromise: Promise<void> | null = null
 

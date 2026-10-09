@@ -5,13 +5,14 @@ interface MobileTabBarProps {
   onNavigate: (view: ViewId) => void
 }
 
-const TABS: { id: ViewId; label: string; icon: 'home' | 'list' | 'progress' }[] = [
+const TABS: { id: ViewId; label: string; icon: 'home' | 'list' | 'progress' | 'calendar' }[] = [
   { id: 'dashboard', label: 'Home', icon: 'home' },
   { id: 'applications', label: 'Apps', icon: 'list' },
   { id: 'inProgress', label: 'Progress', icon: 'progress' },
+  { id: 'calendar', label: 'Calendar', icon: 'calendar' },
 ]
 
-function TabIcon({ icon, active }: { icon: 'home' | 'list' | 'progress'; active: boolean }) {
+function TabIcon({ icon, active }: { icon: 'home' | 'list' | 'progress' | 'calendar'; active: boolean }) {
   const stroke = active ? 'currentColor' : 'currentColor'
   if (icon === 'home') {
     return (
@@ -20,6 +21,19 @@ function TabIcon({ icon, active }: { icon: 'home' | 'list' | 'progress'; active:
           d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z"
           stroke={stroke}
           strokeWidth="2"
+          strokeLinejoin="round"
+        />
+      </svg>
+    )
+  }
+  if (icon === 'calendar') {
+    return (
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden>
+        <path
+          d="M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1ZM4 10h16M8 3v4M16 3v4"
+          stroke={stroke}
+          strokeWidth="2"
+          strokeLinecap="round"
           strokeLinejoin="round"
         />
       </svg>
@@ -57,7 +71,7 @@ export function MobileTabBar({ active, onNavigate }: MobileTabBarProps) {
       style={{ paddingBottom: 'max(0.35rem, env(safe-area-inset-bottom))' }}
       aria-label="Primary"
     >
-      <div className="grid grid-cols-3 gap-1 px-2 pt-1">
+      <div className="grid grid-cols-4 gap-1 px-2 pt-1">
         {TABS.map((tab) => {
           const isActive = active === tab.id
           return (

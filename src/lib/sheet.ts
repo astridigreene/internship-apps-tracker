@@ -143,6 +143,8 @@ const LINKED_HEADER_ALIASES = {
   dateOffered: ['date offered', 'offered', 'date sent', 'sent'],
   lengthMinutes: ['length (minutes)', 'length minutes', 'length', 'duration', 'minutes'],
   site: ['site', 'platform', 'link', 'url'],
+  scheduled: ['scheduled for', 'scheduled', 'scheduled time', 'planned', 'do at'],
+  calendarEvent: ['calendar event', 'calendar event id', 'gcal event'],
   complete: ['complete', 'completed', 'done'],
   dateTime: [
     'date & time',
@@ -471,6 +473,8 @@ function parseAssessmentSheet(
     dateOffered: resolveColumnIndex(headerMap, LINKED_HEADER_ALIASES.dateOffered) ?? null,
     lengthMinutes: resolveColumnIndex(headerMap, LINKED_HEADER_ALIASES.lengthMinutes) ?? null,
     site: resolveColumnIndex(headerMap, LINKED_HEADER_ALIASES.site) ?? null,
+    scheduled: resolveColumnIndex(headerMap, LINKED_HEADER_ALIASES.scheduled) ?? null,
+    calendarEvent: resolveColumnIndex(headerMap, LINKED_HEADER_ALIASES.calendarEvent) ?? null,
     complete: resolveColumnIndex(headerMap, LINKED_HEADER_ALIASES.complete) ?? null,
     appRow: resolveColumnIndex(headerMap, LINKED_HEADER_ALIASES.appRow) ?? null,
   }
@@ -494,6 +498,8 @@ function parseAssessmentSheet(
       dateOffered: formatDisplayDate(cellAt(row, columns.dateOffered)) || cellAt(row, columns.dateOffered),
       lengthMinutes: cellAt(row, columns.lengthMinutes),
       site: cellAt(row, columns.site),
+      scheduled: cellAt(row, columns.scheduled),
+      calendarEventId: cellAt(row, columns.calendarEvent),
       complete: normalizeYesNo(cellAt(row, columns.complete)),
       appRow: parseAppRow(cellAt(row, columns.appRow)),
       sheetRow: i + 1,
@@ -1182,6 +1188,8 @@ const ASSESSMENT_HEADER_ROW = [
   'Site',
   'Complete',
   'App Row',
+  'Scheduled For',
+  'Calendar Event',
 ]
 const INTERVIEW_HEADER_ROW = ['Company', 'Date & Time', 'End Time', 'Notes', 'Complete', 'App Row']
 const SCREENING_HEADER_ROW = ['Company', 'Date & Time', 'End Time', 'Notes', 'App Row']
@@ -1189,6 +1197,8 @@ const SCREENING_HEADER_ROW = ['Company', 'Date & Time', 'End Time', 'Notes', 'Ap
 const ADDED_LINKED_HEADERS = {
   endTime: 'End Time',
   appRow: 'App Row',
+  scheduled: 'Scheduled For',
+  calendarEvent: 'Calendar Event',
 } as const
 
 function headerMapFor(headers: string[]): Map<string, number> {
@@ -1274,6 +1284,7 @@ export async function appendAssessmentEntry(options: {
     accessToken: options.accessToken,
     sheetTitle,
     defaultHeader: ASSESSMENT_HEADER_ROW,
+    addHeaders: ['scheduled', 'calendarEvent'],
   })
   const { columns } = parseAssessmentSheet([headers], options.kind)
   if (!columns) {
@@ -1282,6 +1293,7 @@ export async function appendAssessmentEntry(options: {
 
   const deadline = formatSheetDateTime(options.input.deadline) || options.input.deadline
   const dateOffered = formatDisplayDate(options.input.dateOffered) || options.input.dateOffered
+  const scheduled = formatSheetDateTime(options.input.scheduled) || (options.input.scheduled ?? '')
   const appRow = options.input.appRow ?? null
   const sheetRow = await appendRow({
     spreadsheetId: options.spreadsheetId,
@@ -1296,6 +1308,7 @@ export async function appendAssessmentEntry(options: {
       [columns.site, options.input.site],
       [columns.complete, 'No'],
       [columns.appRow, appRow === null ? '' : String(appRow)],
+      [columns.scheduled, scheduled],
     ]),
     verifyValue: options.input.company,
   })
@@ -1308,6 +1321,8 @@ export async function appendAssessmentEntry(options: {
     dateOffered,
     lengthMinutes: options.input.lengthMinutes,
     site: options.input.site,
+    scheduled,
+    calendarEventId: '',
     complete: false,
     appRow,
     sheetRow,
@@ -1548,7 +1563,7 @@ async function putRowCells(options: {
   await batchPutValues(options.spreadsheetId, options.accessToken, data, 'Could not save your changes')
 }
 
-/** Overwrite an OA/HireVue entry's details (Complete and App Row are left alone). */
+/** Overwrite an OA/HireVue entry's details (Complete, App Row and Calendar Event are left alone). */
 export async function updateAssessmentEntry(options: {
   spreadsheetId: string
   accessToken: string
@@ -1563,6 +1578,7 @@ export async function updateAssessmentEntry(options: {
     accessToken: options.accessToken,
     sheetTitle,
     defaultHeader: ASSESSMENT_HEADER_ROW,
+    addHeaders: ['scheduled', 'calendarEvent'],
   })
   const { columns } = parseAssessmentSheet([headers], kind)
   if (!columns) {
@@ -1571,6 +1587,7 @@ export async function updateAssessmentEntry(options: {
 
   const deadline = formatSheetDateTime(options.input.deadline) || options.input.deadline
   const dateOffered = formatDisplayDate(options.input.dateOffered) || options.input.dateOffered
+  const scheduled = formatSheetDateTime(options.input.scheduled) || (options.input.scheduled ?? '')
   await putRowCells({
     spreadsheetId: options.spreadsheetId,
     accessToken: options.accessToken,
@@ -1583,6 +1600,7 @@ export async function updateAssessmentEntry(options: {
       [columns.dateOffered, dateOffered],
       [columns.lengthMinutes, options.input.lengthMinutes],
       [columns.site, options.input.site],
+      [columns.scheduled, scheduled],
     ],
   })
 
@@ -1594,7 +1612,38 @@ export async function updateAssessmentEntry(options: {
     dateOffered,
     lengthMinutes: options.input.lengthMinutes,
     site: options.input.site,
+    scheduled,
   }
+}
+
+/** Record (or clear, with '') the Google Calendar event ID for an OA/HireVue entry's scheduled time. */
+export async function updateAssessmentCalendarEvent(options: {
+  spreadsheetId: string
+  accessToken: string
+  year: string
+  entry: AssessmentEntry
+  eventId: string
+}): Promise<void> {
+  const sheetTitle = linkedTabTitle(options.year, options.entry.kind)
+  const headers = await prepareLinkedTab({
+    spreadsheetId: options.spreadsheetId,
+    accessToken: options.accessToken,
+    sheetTitle,
+    defaultHeader: ASSESSMENT_HEADER_ROW,
+    addHeaders: ['scheduled', 'calendarEvent'],
+  })
+  const { columns } = parseAssessmentSheet([headers], options.entry.kind)
+  if (!columns || columns.calendarEvent === null) {
+    throw missingHeadersError(sheetTitle, `a ${ADDED_LINKED_HEADERS.calendarEvent}`)
+  }
+  await putRowCells({
+    spreadsheetId: options.spreadsheetId,
+    accessToken: options.accessToken,
+    sheetTitle,
+    sheetRow: options.entry.sheetRow,
+    // Leading apostrophe keeps Sheets from reading an all-digit ID as a number.
+    cells: [[columns.calendarEvent, options.eventId ? `'${options.eventId}` : '']],
+  })
 }
 
 /** Overwrite an interview/screening entry's details (Complete and App Row are left alone). */

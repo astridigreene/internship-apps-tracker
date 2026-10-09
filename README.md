@@ -27,6 +27,8 @@ Your application rows stay in **your** Google Sheet. The site does not store you
   - Row click → detail popup (edit status, advance round, mark rejected, log/complete linked OA·HireVue·Screening·Interview entries)
   - New application, bulk status edit + save, delete row
 - **In Progress tab** — every application currently Progressed or Interview, with its linked OA/HireVue deadlines, screenings, and interview date/times inline
+- **Calendar tab** — month grid + upcoming list of interviews, screenings, OA/HireVue deadlines, and the times you've scheduled yourself to do an OA/HireVue (click an item to open its application)
+- **Schedule an OA/HireVue** — set a "Do it at" time on an entry and the app creates a Google Calendar event and sends an invite (to `VITE_CALENDAR_INVITE_EMAIL`, or your signed-in account); editing or deleting the entry updates or cancels the event. Needs the **Google Calendar API** enabled in the OAuth client's Cloud project
 - **Sheet setup help** — if headers/tabs are wrong, the app shows which columns to add instead of failing silently
 - **Dark mode** follows system preference
 
@@ -51,7 +53,7 @@ make them by hand:
 
 | Tab | Columns |
 | --- | --- |
-| `2027 OA` | Deadline (date & time), Auto, Company, Date Offered, Length (minutes), Site, Complete, App Row |
+| `2027 OA` | Deadline (date & time), Auto, Company, Date Offered, Length (minutes), Site, Complete, App Row, Scheduled For, Calendar Event |
 | `2027 HireVue` | same as OA |
 | `2027 Interviews` | Company, Date & Time, End Time, Notes, Complete, App Row |
 | `2027 Screening` | Company, Date & Time, End Time, Notes, App Row |

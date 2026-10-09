@@ -210,6 +210,10 @@ export interface AssessmentEntry {
   dateOffered: string
   lengthMinutes: string
   site: string
+  /** When you've planned to sit down and do it (Scheduled For column); '' when not set. */
+  scheduled: string
+  /** Google Calendar event ID for the scheduled time (Calendar Event column); '' when none. */
+  calendarEventId: string
   complete: boolean
   /** Row of the application this belongs to on the year tab (App Row column), if recorded. */
   appRow: number | null
@@ -223,6 +227,8 @@ export interface NewAssessmentInput {
   dateOffered: string
   lengthMinutes: string
   site: string
+  /** Planned time to complete it, as YYYY-MM-DDTHH:MM (from `<input type="datetime-local">`); optional. */
+  scheduled?: string
   /** Year-tab row of the application this belongs to. */
   appRow?: number
 }
@@ -280,6 +286,8 @@ export interface AssessmentSheetColumns {
   dateOffered: number | null
   lengthMinutes: number | null
   site: number | null
+  scheduled: number | null
+  calendarEvent: number | null
   complete: number | null
   appRow: number | null
 }
@@ -324,7 +332,7 @@ export interface TrackerData {
   screeningTab: LinkedTabState<ScreeningSheetColumns>
 }
 
-export type ViewId = 'dashboard' | 'applications' | 'inProgress'
+export type ViewId = 'dashboard' | 'applications' | 'inProgress' | 'calendar'
 
 /** Bundled CRUD handlers for the OA/HireVue/Interviews/Screening linked tabs. */
 export interface LinkedActions {

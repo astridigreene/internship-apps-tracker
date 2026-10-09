@@ -29,12 +29,14 @@ const EMPTY = (company: string): NewAssessmentInput => ({
   dateOffered: '',
   lengthMinutes: '',
   site: '',
+  scheduled: '',
 })
 
 /** An entry's sheet values in the shapes the form inputs expect. */
 function formFromEntry(entry: AssessmentEntry): NewAssessmentInput {
   const deadline = parseSheetDate(entry.deadline)
   const offered = parseSheetDate(entry.dateOffered)
+  const scheduled = parseSheetDate(entry.scheduled)
   return {
     company: entry.company,
     deadline: deadline ? toDateTimeInputValue(deadline) : entry.deadline,
@@ -42,6 +44,7 @@ function formFromEntry(entry: AssessmentEntry): NewAssessmentInput {
     dateOffered: offered ? toDateInputValue(offered) : entry.dateOffered,
     lengthMinutes: entry.lengthMinutes,
     site: entry.site,
+    scheduled: scheduled ? toDateTimeInputValue(scheduled) : entry.scheduled,
   }
 }
 
@@ -132,6 +135,18 @@ export function AssessmentPanel({
             onChange={(e) => setForm((f) => ({ ...f, deadline: e.target.value }))}
             className={fieldClass}
           />
+        </label>
+        <label className="col-span-2 text-[10px] font-bold uppercase text-app-text-weak">
+          Do it at (optional)
+          <input
+            type="datetime-local"
+            value={form.scheduled ?? ''}
+            onChange={(e) => setForm((f) => ({ ...f, scheduled: e.target.value }))}
+            className={fieldClass}
+          />
+          <span className="mt-0.5 block text-[10px] font-semibold normal-case text-app-text-weak">
+            Blocks the time on your Google Calendar and sends you an invite.
+          </span>
         </label>
         <label className="text-[10px] font-bold uppercase text-app-text-weak">
           Date Offered
@@ -231,6 +246,12 @@ export function AssessmentPanel({
                       <span className="ml-1 font-normal text-app-text-weak">· Auto</span>
                     ) : null}
                   </p>
+                  {entry.scheduled ? (
+                    <p className="truncate text-[11px] font-semibold text-kpi-oa-text">
+                      Doing it {formatDisplayDateTime(entry.scheduled) || entry.scheduled}
+                      {entry.calendarEventId ? ' · on calendar' : ''}
+                    </p>
+                  ) : null}
                   <p className="truncate text-[11px] text-app-text-weak">
                     {[entry.site, entry.lengthMinutes ? `${entry.lengthMinutes} min` : '']
                       .filter(Boolean)
