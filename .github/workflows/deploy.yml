@@ -37,6 +37,8 @@ jobs:
         env:
           VITE_BASE_PATH: /${{ github.event.repository.name }}/
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+          # Optional repo variable; invites go to the signed-in account when unset.
+          VITE_CALENDAR_INVITE_EMAIL: ${{ vars.CALENDAR_INVITE_EMAIL }}
           # Same classic PAT as Actions secret GH_PAT (repo scope). Baked into the
           # static site only to fire repository_dispatch — never sends sheet rows.
           VITE_GH_PAT: ${{ secrets.GH_PAT }}
