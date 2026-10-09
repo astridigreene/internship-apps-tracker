@@ -3,8 +3,8 @@
  *
  * Sends to REMINDER_EMAIL:
  *  - a nudge to keep applying
- *  - list of pending OA/HireVue entries (Complete = No) from the "<year> OA" and
- *    "<year> HireVue" sibling tabs, sorted by Deadline
+ *  - list of pending OA/HireVue entries (Complete = No, deadline not yet passed)
+ *    from the "<year> OA" and "<year> HireVue" sibling tabs, sorted by Deadline
  *
  * Setup (one-time):
  * 1. Open your tracker spreadsheet → Extensions → Apps Script.
@@ -135,8 +135,38 @@ function _normalizeYesNo_(raw) {
   return v === 'y' || v === 'yes' || v === 'true' || v === '1'
 }
 
+/** A Deadline cell as a Date (Sheets usually hands back a Date; text is parsed), or null. */
+function _deadlineDate_(value) {
+  if (value instanceof Date) {
+    return isNaN(value.getTime()) ? null : value
+  }
+  var s = String(value || '').trim()
+  if (!s) {
+    return null
+  }
+  var parsed = new Date(s)
+  return isNaN(parsed.getTime()) ? null : parsed
+}
+
 /**
- * Pending (Complete != Yes) rows from one assessment tab ("<year> OA" or "<year> HireVue").
+ * True once a deadline has passed — same rule as the dashboard: a deadline with
+ * a time is due at that time; a bare date (midnight) is due by the end of that day.
+ */
+function _isExpired_(deadline, now) {
+  if (!deadline) {
+    return false
+  }
+  var due = new Date(deadline.getTime())
+  if (due.getHours() === 0 && due.getMinutes() === 0 && due.getSeconds() === 0) {
+    due.setHours(23, 59, 59, 999)
+  }
+  return due.getTime() < now.getTime()
+}
+
+/**
+ * Pending rows from one assessment tab ("<year> OA" or "<year> HireVue"): not
+ * marked Complete and not past their deadline. Rows with no readable deadline
+ * are kept, since there's no way to tell they've expired.
  */
 function _listPendingFromTab_(spreadsheet, sheetName, kind) {
   var sheet = spreadsheet.getSheetByName(sheetName)
@@ -157,6 +187,7 @@ function _listPendingFromTab_(spreadsheet, sheetName, kind) {
     return []
   }
 
+  var now = new Date()
   var out = []
   for (var r = 1; r < values.length; r++) {
     var row = values[r]
@@ -167,11 +198,15 @@ function _listPendingFromTab_(spreadsheet, sheetName, kind) {
     if (completeCol >= 0 && _normalizeYesNo_(row[completeCol])) {
       continue
     }
+    var deadline = _deadlineDate_(row[deadlineCol])
+    if (_isExpired_(deadline, now)) {
+      continue
+    }
     out.push({
       company: company,
       kind: kind,
       deadline: _formatCellDate_(row[deadlineCol]),
-      deadlineSortKey: row[deadlineCol] instanceof Date ? row[deadlineCol].getTime() : Number.MAX_SAFE_INTEGER,
+      deadlineSortKey: deadline ? deadline.getTime() : Number.MAX_SAFE_INTEGER,
     })
   }
   return out
