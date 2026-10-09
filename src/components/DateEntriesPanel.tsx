@@ -3,6 +3,7 @@ import type { InterviewEntry, NewInterviewInput, NewScreeningInput, ScreeningEnt
 import {
   formatDisplayDateTime,
   formatTimeOfDay,
+  hasMeetingEnded,
   parseSheetDate,
   parseTimeOfDay,
   toDateTimeInputValue,
@@ -237,6 +238,11 @@ export function DateEntriesPanel<E extends Entry>({
                   >
                     {entry.complete ? 'Complete' : 'Pending'}
                   </button>
+                ) : null}
+                {!hasComplete(entry) && hasMeetingEnded(entry.dateTime, entry.endTime) ? (
+                  <span className="shrink-0 rounded-full bg-kpi-offer-bg px-2 py-0.5 text-[11px] font-bold text-kpi-offer-text">
+                    Done
+                  </span>
                 ) : null}
                 {onEdit ? (
                   <button

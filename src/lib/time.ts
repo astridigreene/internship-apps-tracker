@@ -237,6 +237,28 @@ export function endMoment(start: Date | null, endTime: string): Date | null {
   return new Date(start.getFullYear(), start.getMonth(), start.getDate(), Math.floor(minutes / 60), minutes % 60)
 }
 
+/**
+ * When an interview/screening is over: its End Time, or an hour after it starts
+ * when none is set. A bare date (no time, no End Time) comes back as that
+ * midnight, which isExpired treats as the end of the day.
+ */
+export function meetingEnd(start: Date | null, endTime: string): Date | null {
+  if (!start) {
+    return null
+  }
+  const end = endMoment(start, endTime)
+  if (end) {
+    return end
+  }
+  const hasTime = start.getHours() !== 0 || start.getMinutes() !== 0 || start.getSeconds() !== 0
+  return hasTime ? new Date(start.getTime() + 60 * 60_000) : start
+}
+
+/** True once an interview/screening has ended (see meetingEnd). */
+export function hasMeetingEnded(dateTime: string, endTime: string, now = new Date()): boolean {
+  return isExpired(meetingEnd(parseSheetDate(dateTime), endTime), now)
+}
+
 /** Stamp written into the Last Updated column (M/D/YYYY). */
 export function statusUpdateStamp(now = new Date()): string {
   return formatDisplayDate(now)

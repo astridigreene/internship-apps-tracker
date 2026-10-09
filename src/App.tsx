@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   deriveHighestStageOnStatusChange,
   isForwardProgress,
@@ -50,7 +50,7 @@ import {
   type LinkedKind,
   updateSheetStatus,
 } from './lib/sheet'
-import { formatDisplayDateTime, parseSheetDate, statusUpdateStamp } from './lib/time'
+import { formatDisplayDateTime, hasMeetingEnded, parseSheetDate, statusUpdateStamp } from './lib/time'
 import {
   createCalendarEvent,
   deleteCalendarEvent,
@@ -109,6 +109,8 @@ export default function App() {
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [sheetSetupError, setSheetSetupError] = useState<SheetSetupError | null>(null)
+  /** Interviews already auto-marked Complete this session, so un-marking one by hand sticks. */
+  const autoCompletedRef = useRef(new Set<string>())
 
   const resolveSheetId = useCallback(
     (email: string, explicit?: string | null) => {
@@ -323,6 +325,62 @@ export default function App() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Mark interviews Complete on the sheet once they've ended — checked on every
+  // data change and once a minute while the app is open.
+  useEffect(() => {
+    const completeCol = data?.interviewsTab.columns?.complete
+    if (!data || !sheetId || completeCol === null || completeCol === undefined) {
+      return
+    }
+    const sheetTitle = linkedTabNames(selectedYear).interviews
+    const keyFor = (entry: InterviewEntry) => `${sheetId}|${sheetTitle}|${entry.sheetRow}|${entry.dateTime}`
+
+    async function markEnded() {
+      const session = loadSession()
+      // Background work: never pop a sign-in window; a later load will catch up.
+      if (!session || !isSessionValid(session)) return
+      const ended = data!.interviewEntries.filter(
+        (entry) =>
+          !entry.complete &&
+          !autoCompletedRef.current.has(keyFor(entry)) &&
+          hasMeetingEnded(entry.dateTime, entry.endTime),
+      )
+      if (!ended.length) return
+      ended.forEach((entry) => autoCompletedRef.current.add(keyFor(entry)))
+      try {
+        for (const entry of ended) {
+          await updateLinkedComplete({
+            spreadsheetId: sheetId!,
+            accessToken: session.accessToken,
+            sheetTitle,
+            sheetRow: entry.sheetRow,
+            completeColumn: completeCol!,
+            complete: true,
+          })
+        }
+        const rows = new Set(ended.map((entry) => entry.sheetRow))
+        setData((current) =>
+          current
+            ? {
+                ...current,
+                interviewEntries: current.interviewEntries.map((e) =>
+                  rows.has(e.sheetRow) ? { ...e, complete: true } : e,
+                ),
+              }
+            : current,
+        )
+      } catch (err) {
+        setError(
+          `Couldn't mark finished interviews complete: ${err instanceof Error ? err.message : String(err)}`,
+        )
+      }
+    }
+
+    void markEnded()
+    const timer = window.setInterval(() => void markEnded(), 60_000)
+    return () => window.clearInterval(timer)
+  }, [data, sheetId, selectedYear])
 
   async function handleSignIn() {
     setError(null)

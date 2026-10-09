@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Application, ApplicationStatus, LinkedActions, TrackerData } from '../types'
 import { ApplicationDetailModal } from '../components/ApplicationDetailModal'
 import { linkedApplicationFor, linkedEntriesForApplication } from '../lib/sheet'
 import {
   endMoment,
   formatTimeOfDay,
+  hasMeetingEnded,
   isExpired,
   isSameDay,
   parseSheetDate,
@@ -60,6 +61,29 @@ const TYPE_STYLES: Record<EventType, { chip: string; dot: string; name: string }
 }
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+// Day-cell geometry (px), matching the classes below: p-1 + border-b + h-5 day number + gap-0.5
+const CELL_CHROME = 4 + 4 + 1 + 20 + 2
+const CHIP_HEIGHT = 18 // leading-4 + 1px border top and bottom
+const CHIP_GAP = 2
+const MORE_LINE = 12 // leading-3
+/** Chips shown when cells grow to fit their content (below lg) — keeps busy weeks from towering. */
+const MAX_UNCONSTRAINED_CHIPS = 3
+
+/**
+ * How many chips to draw in a day cell, leaving room for "+N more" when some
+ * are hidden. `space` is the px a cell has for chips, or null when cells grow to fit.
+ */
+function visibleChipCount(total: number, space: number | null): number {
+  if (space === null) {
+    return total <= MAX_UNCONSTRAINED_CHIPS ? total : MAX_UNCONSTRAINED_CHIPS
+  }
+  const slot = CHIP_HEIGHT + CHIP_GAP
+  if (total <= Math.floor((space + CHIP_GAP) / slot)) {
+    return total
+  }
+  return Math.max(0, Math.floor((space - MORE_LINE) / slot))
+}
 
 function hasTimeOfDay(date: Date): boolean {
   return date.getHours() !== 0 || date.getMinutes() !== 0 || date.getSeconds() !== 0
@@ -117,7 +141,12 @@ function buildItems(data: TrackerData): CalendarItem[] {
 
   const dated = [
     ...data.interviewEntries.map((e) => ({ entry: e, type: 'interview' as const, done: e.complete })),
-    ...data.screeningEntries.map((e) => ({ entry: e, type: 'screening' as const, done: false })),
+    // Screenings have no Complete column — they're done once they've ended.
+    ...data.screeningEntries.map((e) => ({
+      entry: e,
+      type: 'screening' as const,
+      done: hasMeetingEnded(e.dateTime, e.endTime),
+    })),
   ]
   for (const { entry, type, done } of dated) {
     const start = parseSheetDate(entry.dateTime)
@@ -148,6 +177,26 @@ export function CalendarView({ data, saving, onSaveStatusChanges, linkedActions 
   const [detailApp, setDetailApp] = useState<Application | null>(null)
 
   const items = useMemo(() => buildItems(data), [data])
+
+  // On lg the six week rows split the panel's height evenly, so each cell has a
+  // fixed height; measure it so a busy day shows "+N more" instead of overflowing.
+  const gridRef = useRef<HTMLDivElement>(null)
+  const [chipSpace, setChipSpace] = useState<number | null>(null)
+  useEffect(() => {
+    const grid = gridRef.current
+    if (!grid) return
+    const lg = window.matchMedia('(min-width: 1024px)')
+    const measure = () =>
+      setChipSpace(lg.matches ? grid.getBoundingClientRect().height / 6 - CELL_CHROME : null)
+    const observer = new ResizeObserver(measure)
+    observer.observe(grid)
+    lg.addEventListener('change', measure)
+    measure()
+    return () => {
+      observer.disconnect()
+      lg.removeEventListener('change', measure)
+    }
+  }, [])
   const now = new Date()
   const today = startOfDay(now)
 
@@ -259,9 +308,10 @@ export function CalendarView({ data, saving, onSaveStatusChanges, linkedActions 
             ))}
           </div>
 
-          <div className="grid grid-cols-7 lg:min-h-0 lg:flex-1 lg:auto-rows-fr">
+          <div ref={gridRef} className="grid grid-cols-7 lg:min-h-0 lg:flex-1 lg:auto-rows-fr">
             {days.map((day) => {
               const dayItems = itemsByDay.get(day.getTime()) ?? []
+              const shown = visibleChipCount(dayItems.length, chipSpace)
               const inMonth = day.getMonth() === month.getMonth()
               const isToday = isSameDay(day, today)
               const isSelected = selectedDay !== null && isSameDay(day, selectedDay)
@@ -273,7 +323,7 @@ export function CalendarView({ data, saving, onSaveStatusChanges, linkedActions 
                   aria-pressed={isSelected}
                   aria-label={`${day.toDateString()}, ${dayItems.length} item${dayItems.length === 1 ? '' : 's'}`}
                   className={[
-                    'flex min-h-14 min-w-0 flex-col items-stretch gap-0.5 border-r border-b border-app-border p-1 text-left sm:min-h-20 lg:min-h-0',
+                    'flex min-h-14 min-w-0 flex-col items-stretch gap-0.5 overflow-hidden border-r border-b border-app-border p-1 text-left sm:min-h-20 lg:min-h-0',
                     '[&:nth-child(7n)]:border-r-0',
                     isSelected ? 'bg-app-brand-soft' : 'hover:bg-app-hover',
                     inMonth ? '' : 'opacity-45',
@@ -297,7 +347,7 @@ export function CalendarView({ data, saving, onSaveStatusChanges, linkedActions 
                     ))}
                   </span>
                   <span className="hidden min-w-0 flex-col gap-0.5 sm:flex">
-                    {dayItems.slice(0, 3).map((item) => (
+                    {dayItems.slice(0, shown).map((item) => (
                       <span
                         key={item.key}
                         className={[
@@ -311,8 +361,10 @@ export function CalendarView({ data, saving, onSaveStatusChanges, linkedActions 
                         {item.company}
                       </span>
                     ))}
-                    {dayItems.length > 3 ? (
-                      <span className="text-[10px] font-bold text-app-text-weak">+{dayItems.length - 3} more</span>
+                    {dayItems.length > shown ? (
+                      <span className="text-[10px] leading-3 font-bold text-app-text-weak">
+                        +{dayItems.length - shown} more
+                      </span>
                     ) : null}
                   </span>
                 </button>
