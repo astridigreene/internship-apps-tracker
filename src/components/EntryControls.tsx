@@ -5,10 +5,14 @@ export function DeleteButton({
   label,
   disabled,
   onConfirm,
+  text = 'Delete',
+  confirmText = 'Confirm delete',
 }: {
   label: string
   disabled?: boolean
   onConfirm: () => Promise<void>
+  text?: string
+  confirmText?: string
 }) {
   const [confirming, setConfirming] = useState(false)
 
@@ -27,7 +31,7 @@ export function DeleteButton({
         aria-label={label}
         className="shrink-0 text-[11px] font-bold text-rose-600 hover:underline disabled:opacity-50 dark:text-rose-400"
       >
-        Delete
+        {text}
       </button>
     )
   }
@@ -43,7 +47,7 @@ export function DeleteButton({
         }}
         className="rounded bg-rose-600 px-1.5 py-0.5 text-white hover:bg-rose-700 disabled:opacity-50"
       >
-        Confirm delete
+        {confirmText}
       </button>
       <button
         type="button"

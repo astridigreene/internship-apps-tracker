@@ -332,6 +332,13 @@ export interface TrackerData {
   screeningTab: LinkedTabState<ScreeningSheetColumns>
 }
 
+/**
+ * The save itself went through, but a follow-up (e.g. the calendar invite)
+ * didn't. Forms should close — re-submitting an add would duplicate the row —
+ * and show the message.
+ */
+export class SavedWithWarningError extends Error {}
+
 export type ViewId = 'dashboard' | 'applications' | 'inProgress' | 'calendar'
 
 /** Bundled CRUD handlers for the OA/HireVue/Interviews/Screening linked tabs. */

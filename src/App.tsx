@@ -12,6 +12,7 @@ import {
   type NewInterviewInput,
   type NewScreeningInput,
   type ScreeningEntry,
+  SavedWithWarningError,
   type TrackerData,
   type ViewId,
 } from './types'
@@ -52,6 +53,7 @@ import {
 } from './lib/sheet'
 import { formatDisplayDateTime, hasMeetingEnded, parseSheetDate, statusUpdateStamp } from './lib/time'
 import {
+  CalendarScopeError,
   createCalendarEvent,
   deleteCalendarEvent,
   updateCalendarEvent,
@@ -778,34 +780,68 @@ export default function App() {
       location: entry.site,
       start,
       durationMinutes: Number.isFinite(length) && length > 0 ? length : 60,
-      attendeeEmail: config.calendarInviteEmail || user?.email || '',
+      attendeeEmail: inviteEmail,
+    }
+  }
+
+  /** Who calendar invites go to. */
+  const inviteEmail = config.calendarInviteEmail || user?.email || ''
+
+  /**
+   * Run a Calendar API call; if the sign-in is missing Calendar access, ask Google
+   * for it (consent popup) and try once more with the new token.
+   */
+  async function withCalendarAccess<T>(token: string, call: (token: string) => Promise<T>): Promise<T> {
+    try {
+      return await call(token)
+    } catch (err) {
+      if (!(err instanceof CalendarScopeError)) throw err
+      let fresh: string
+      try {
+        const { accessToken: next, expiresIn } = await requestGoogleAccessToken(config.clientId, {
+          prompt: 'consent',
+        })
+        const profile = user ?? (await fetchUserProfile(next))
+        persist({ token: next, expiresIn, profile })
+        setAccessToken(next)
+        fresh = next
+      } catch {
+        throw err
+      }
+      return call(fresh)
     }
   }
 
   /**
    * Bring an OA/HireVue entry's calendar invite in line with its Scheduled For
-   * time — create or update it when scheduled, remove it when cleared — and
-   * record the event ID on the sheet. A failure shows in the error banner but
-   * doesn't undo the sheet save that came before it.
+   * time — create or update it when scheduled, cancel it when cleared — and
+   * record the event ID on the sheet. Never throws: the sheet save before it
+   * stands either way, and `problem` says what went wrong with the invite.
    */
-  async function syncAssessmentCalendar(token: string, entry: AssessmentEntry): Promise<AssessmentEntry> {
+  async function syncAssessmentCalendar(
+    token: string,
+    entry: AssessmentEntry,
+  ): Promise<{ entry: AssessmentEntry; problem: string | null }> {
     const start = parseSheetDate(entry.scheduled)
     let eventId: string
     try {
       if (start) {
+        if (!inviteEmail) {
+          return { entry, problem: 'no email to send the calendar invite to.' }
+        }
         const input = calendarEventFor(entry, start)
-        eventId = entry.calendarEventId
-          ? await updateCalendarEvent(token, entry.calendarEventId, input)
-          : await createCalendarEvent(token, input)
+        const result = await withCalendarAccess(token, (t) =>
+          entry.calendarEventId ? updateCalendarEvent(t, entry.calendarEventId, input) : createCalendarEvent(t, input),
+        )
+        eventId = result.id
       } else {
         if (entry.calendarEventId) {
-          await deleteCalendarEvent(token, entry.calendarEventId)
+          await withCalendarAccess(token, (t) => deleteCalendarEvent(t, entry.calendarEventId))
         }
         eventId = ''
       }
     } catch (err) {
-      setError(`Saved the ${entry.kind}, but ${err instanceof Error ? err.message : String(err)}`)
-      return entry
+      return { entry, problem: err instanceof Error ? err.message : String(err) }
     }
     const synced = { ...entry, calendarEventId: eventId }
     if (eventId !== entry.calendarEventId) {
@@ -818,14 +854,24 @@ export default function App() {
           eventId,
         })
       } catch (err) {
-        setError(
-          `Updated the calendar invite, but couldn't record it on the sheet: ${
+        return {
+          entry: synced,
+          problem: `the invite went out, but couldn't be recorded on the sheet (editing it again may send a duplicate): ${
             err instanceof Error ? err.message : String(err)
           }`,
-        )
+        }
       }
     }
-    return synced
+    return { entry: synced, problem: null }
+  }
+
+  /** The warning thrown after a save whose calendar step failed. */
+  function calendarWarning(entry: AssessmentEntry, problem: string): SavedWithWarningError {
+    return new SavedWithWarningError(
+      entry.scheduled
+        ? `Saved the ${entry.kind}, but the calendar invite wasn't sent — ${problem}`
+        : `Saved the ${entry.kind}, but the calendar invite wasn't cancelled — ${problem}`,
+    )
   }
 
   async function handleAddAssessment(kind: 'OA' | 'HireVue', input: NewAssessmentInput) {
@@ -843,14 +889,20 @@ export default function App() {
         kind,
         input,
       })
-      const entry = appended.scheduled ? await syncAssessmentCalendar(token, appended) : appended
+      const { entry, problem } = appended.scheduled
+        ? await syncAssessmentCalendar(token, appended)
+        : { entry: appended, problem: null }
       setData((current) => {
         if (!current) return current
         return kind === 'OA'
           ? { ...current, oaEntries: [...current.oaEntries, entry] }
           : { ...current, hireVueEntries: [...current.hireVueEntries, entry] }
       })
+      if (problem) {
+        throw calendarWarning(entry, problem)
+      }
     } catch (err) {
+      if (err instanceof SavedWithWarningError) throw err
       const message = err instanceof Error ? err.message : `Could not add ${kind}`
       setError(message)
       throw err instanceof Error ? err : new Error(message)
@@ -1017,11 +1069,15 @@ export default function App() {
           : { ...current, hireVueEntries: shiftRowsAfterDelete(current.hireVueEntries, entry.sheetRow) }
       })
       if (entry.calendarEventId) {
-        await deleteCalendarEvent(token, entry.calendarEventId).catch((err: unknown) => {
-          setError(
-            `Deleted the ${kind}, but ${err instanceof Error ? err.message : String(err)}`,
-          )
-        })
+        await withCalendarAccess(token, (t) => deleteCalendarEvent(t, entry.calendarEventId)).catch(
+          (err: unknown) => {
+            setError(
+              `Deleted the ${kind}, but its calendar invite wasn't cancelled — ${
+                err instanceof Error ? err.message : String(err)
+              }`,
+            )
+          },
+        )
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : `Could not delete ${kind}`
@@ -1159,8 +1215,10 @@ export default function App() {
   const replaceRow = <T extends { sheetRow: number }>(list: T[], saved: T) =>
     list.map((e) => (e.sheetRow === saved.sheetRow ? saved : e))
 
-  function handleEditAssessment(entry: AssessmentEntry, input: NewAssessmentInput) {
-    return runLinkedEdit(
+  async function handleEditAssessment(entry: AssessmentEntry, input: NewAssessmentInput) {
+    let problem: string | null = null
+    let synced: AssessmentEntry = entry
+    await runLinkedEdit(
       entry.kind,
       async (token) => {
         const saved = await updateAssessmentEntry({
@@ -1176,13 +1234,19 @@ export default function App() {
           [e.scheduled, e.company, e.deadline, e.lengthMinutes, e.site].join('\u0000')
         const needsSync =
           inviteFields(saved) !== inviteFields(entry) || (saved.scheduled !== '' && !saved.calendarEventId)
-        return needsSync ? syncAssessmentCalendar(token, saved) : saved
+        if (!needsSync) return (synced = saved)
+        const result = await syncAssessmentCalendar(token, saved)
+        problem = result.problem
+        return (synced = result.entry)
       },
       (current, saved) =>
         saved.kind === 'OA'
           ? { ...current, oaEntries: replaceRow(current.oaEntries, saved) }
           : { ...current, hireVueEntries: replaceRow(current.hireVueEntries, saved) },
     )
+    if (problem) {
+      throw calendarWarning(synced, problem)
+    }
   }
 
   function handleEditInterview(entry: InterviewEntry, input: NewInterviewInput) {

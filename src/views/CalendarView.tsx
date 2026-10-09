@@ -3,6 +3,7 @@ import type { Application, ApplicationStatus, AssessmentEntry, LinkedActions, Tr
 import { ApplicationDetailModal } from '../components/ApplicationDetailModal'
 import { assessmentFormFromEntry } from '../lib/assessmentForm'
 import { SearchSelect, type SearchSelectOption } from '../components/SearchSelect'
+import { DeleteButton } from '../components/EntryControls'
 import { linkedApplicationFor, linkedEntriesForApplication } from '../lib/sheet'
 import {
   endMoment,
@@ -39,6 +40,8 @@ interface CalendarItem {
   allDay: boolean
   done: boolean
   app: Application | undefined
+  /** The OA/HireVue behind a 'scheduled' item (so its time can be cancelled). */
+  assessment?: AssessmentEntry
 }
 
 const TYPE_STYLES: Record<EventType, { chip: string; dot: string; name: string }> = {
@@ -139,6 +142,7 @@ function buildItems(data: TrackerData): CalendarItem[] {
         allDay: false,
         done: entry.complete,
         app: appFor(entry),
+        assessment: entry,
       })
     }
   }
@@ -317,6 +321,18 @@ export function CalendarView({ data, saving, onSaveStatusChanges, linkedActions 
   const [selectedDay, setSelectedDay] = useState<Date | null>(null)
   const [detailApp, setDetailApp] = useState<Application | null>(null)
   const [scheduling, setScheduling] = useState(false)
+  /** Outcome of cancelling a scheduled time from the list (errors, or a saved-but-invite-failed note). */
+  const [listWarning, setListWarning] = useState<string | null>(null)
+
+  async function cancelScheduled(entry: AssessmentEntry) {
+    if (!linkedActions) return
+    setListWarning(null)
+    try {
+      await linkedActions.editAssessment(entry, { ...assessmentFormFromEntry(entry), scheduled: '' })
+    } catch (err) {
+      setListWarning(err instanceof Error ? err.message : 'Could not cancel the scheduled time')
+    }
+  }
 
   const items = useMemo(() => buildItems(data), [data])
 
@@ -558,6 +574,19 @@ export function CalendarView({ data, saving, onSaveStatusChanges, linkedActions 
               onDone={() => setScheduling(false)}
             />
           ) : null}
+          {listWarning ? (
+            <div className="flex items-start gap-2 border-b border-app-border bg-kpi-reject-bg px-3 py-2 text-[11px] font-semibold text-kpi-reject-text">
+              <p className="flex-1">{listWarning}</p>
+              <button
+                type="button"
+                onClick={() => setListWarning(null)}
+                aria-label="Dismiss"
+                className="shrink-0 font-bold hover:underline"
+              >
+                ✕
+              </button>
+            </div>
+          ) : null}
           {!selectedDay && linkedActions ? (
             <p className="border-b border-app-border px-3 py-1.5 text-[11px] font-semibold text-app-text-weak">
               Click a day to schedule a time for an OA or HireVue.
@@ -580,28 +609,42 @@ export function CalendarView({ data, saving, onSaveStatusChanges, linkedActions 
                           : item.start.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
                       </p>
                     ) : null}
-                    <button
-                      type="button"
-                      disabled={!item.app}
-                      onClick={() => item.app && setDetailApp(item.app)}
-                      className={[
-                        'flex w-full items-center gap-2.5 px-3 py-2 text-left enabled:hover:bg-app-hover',
-                        isPast(item, now) ? 'opacity-55' : '',
-                      ].join(' ')}
-                    >
-                      <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${TYPE_STYLES[item.type].dot}`} aria-hidden />
-                      <span className="min-w-0 flex-1">
-                        <span className={`block truncate text-[13px] font-bold text-app-text ${item.done ? 'line-through' : ''}`}>
-                          {item.company || 'Untitled'}
+                    <div className="flex items-center hover:bg-app-hover">
+                      <button
+                        type="button"
+                        disabled={!item.app}
+                        onClick={() => item.app && setDetailApp(item.app)}
+                        className={[
+                          'flex min-w-0 flex-1 items-center gap-2.5 py-2 pl-3 text-left',
+                          item.assessment && linkedActions ? 'pr-2' : 'pr-3',
+                          isPast(item, now) ? 'opacity-55' : '',
+                        ].join(' ')}
+                      >
+                        <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${TYPE_STYLES[item.type].dot}`} aria-hidden />
+                        <span className="min-w-0 flex-1">
+                          <span className={`block truncate text-[13px] font-bold text-app-text ${item.done ? 'line-through' : ''}`}>
+                            {item.company || 'Untitled'}
+                          </span>
+                          <span className="block truncate text-[11px] font-semibold text-app-text-weak">
+                            {[item.label, item.app?.role].filter(Boolean).join(' · ')}
+                          </span>
                         </span>
-                        <span className="block truncate text-[11px] font-semibold text-app-text-weak">
-                          {[item.label, item.app?.role].filter(Boolean).join(' · ')}
+                        <span className="shrink-0 text-right text-[11px] font-bold text-app-text-weak tabular-nums">
+                          {timeLabel(item)}
                         </span>
-                      </span>
-                      <span className="shrink-0 text-right text-[11px] font-bold text-app-text-weak tabular-nums">
-                        {timeLabel(item)}
-                      </span>
-                    </button>
+                      </button>
+                      {item.assessment && linkedActions && !item.done ? (
+                        <span className="shrink-0 pr-3">
+                          <DeleteButton
+                            label={`Cancel the scheduled time for ${item.company}`}
+                            text="Cancel"
+                            confirmText="Cancel it"
+                            disabled={saving}
+                            onConfirm={() => cancelScheduled(item.assessment!)}
+                          />
+                        </span>
+                      ) : null}
+                    </div>
                   </li>
                 )
               })}

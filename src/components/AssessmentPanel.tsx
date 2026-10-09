@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import type { AssessmentEntry, NewAssessmentInput } from '../types'
+import { SavedWithWarningError, type AssessmentEntry, type NewAssessmentInput } from '../types'
 import {
   formatDisplayDateTime,
   isExpired,
@@ -47,6 +47,8 @@ export function AssessmentPanel({
   const [form, setForm] = useState<NewAssessmentInput>(() => EMPTY(companyDefault ?? ''))
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  /** A save that went through but whose calendar invite didn't (shown above the list). */
+  const [warning, setWarning] = useState<string | null>(null)
 
   const sorted = [...entries].sort((a, b) => {
     if (a.complete !== b.complete) {
@@ -84,10 +86,16 @@ export function AssessmentPanel({
     }
     setSubmitting(true)
     setError(null)
+    setWarning(null)
     try {
       await save(form)
       closeForm()
     } catch (err) {
+      if (err instanceof SavedWithWarningError) {
+        closeForm()
+        setWarning(err.message)
+        return
+      }
       setError(err instanceof Error ? err.message : `Could not save ${kind}`)
     } finally {
       setSubmitting(false)
@@ -187,6 +195,17 @@ export function AssessmentPanel({
     </form>
   )
 
+  /** Clear an entry's scheduled time, which cancels its calendar invite. */
+  async function cancelScheduled(entry: AssessmentEntry) {
+    if (!onEdit) return
+    setWarning(null)
+    try {
+      await onEdit(entry, { ...assessmentFormFromEntry(entry), scheduled: '' })
+    } catch (err) {
+      setWarning(err instanceof Error ? err.message : 'Could not cancel the scheduled time')
+    }
+  }
+
   return (
     <div className="rounded-md border border-app-border">
       <div className="flex items-center justify-between border-b border-app-border bg-app-muted px-2.5 py-1.5">
@@ -209,6 +228,20 @@ export function AssessmentPanel({
         ) : null}
       </div>
 
+      {warning ? (
+        <div className="flex items-start gap-2 border-b border-app-border bg-kpi-reject-bg px-2.5 py-2 text-[11px] font-semibold text-kpi-reject-text">
+          <p className="flex-1">{warning}</p>
+          <button
+            type="button"
+            onClick={() => setWarning(null)}
+            aria-label="Dismiss"
+            className="shrink-0 font-bold hover:underline"
+          >
+            ✕
+          </button>
+        </div>
+      ) : null}
+
       {adding ? formJsx : null}
 
       {sorted.length === 0 ? (
@@ -230,10 +263,21 @@ export function AssessmentPanel({
                     ) : null}
                   </p>
                   {entry.scheduled ? (
-                    <p className="truncate text-[11px] font-semibold text-kpi-oa-text">
-                      Doing it {formatDisplayDateTime(entry.scheduled) || entry.scheduled}
-                      {entry.calendarEventId ? ' · on calendar' : ''}
-                    </p>
+                    <div className="flex min-w-0 items-center gap-2">
+                      <p className="truncate text-[11px] font-semibold text-kpi-oa-text">
+                        Doing it {formatDisplayDateTime(entry.scheduled) || entry.scheduled}
+                        {entry.calendarEventId ? ' · invite sent' : ' · no invite yet'}
+                      </p>
+                      {onEdit ? (
+                        <DeleteButton
+                          label={`Cancel the scheduled time for this ${kind}`}
+                          text="Cancel time"
+                          confirmText="Cancel it"
+                          disabled={disabled}
+                          onConfirm={() => cancelScheduled(entry)}
+                        />
+                      ) : null}
+                    </div>
                   ) : null}
                   <p className="truncate text-[11px] text-app-text-weak">
                     {[entry.site, entry.lengthMinutes ? `${entry.lengthMinutes} min` : '']
