@@ -194,6 +194,7 @@ function ScheduleAssessmentForm({
   const [key, setKey] = useState<string | null>(null)
   const [time, setTime] = useState('')
   const [length, setLength] = useState('')
+  const [location, setLocation] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -237,6 +238,7 @@ function ScheduleAssessmentForm({
       await onSave(selected, {
         ...assessmentFormFromEntry(selected),
         lengthMinutes: length.trim(),
+        site: location.trim(),
         scheduled: `${toDateInputValue(day)}T${time}`,
       })
       onDone()
@@ -261,6 +263,7 @@ function ScheduleAssessmentForm({
             setKey(value)
             const entry = pending.find((e) => entryKey(e) === value)
             setLength(entry?.lengthMinutes ?? '')
+            setLocation(entry?.site ?? '')
           }}
           placeholder="Search by company or role…"
           emptyText={pending.length ? 'No matches' : 'No pending OAs or HireVues'}
@@ -288,6 +291,15 @@ function ScheduleAssessmentForm({
           />
         </label>
       </div>
+      <label className="block text-[10px] font-bold uppercase text-app-text-weak">
+        Location
+        <input
+          value={location}
+          onChange={(e) => setLocation(e.target.value)}
+          placeholder="Site, link, or place"
+          className={`${fieldClass} placeholder:font-normal placeholder:text-app-text-weak`}
+        />
+      </label>
       {error ? <p className="text-[11px] font-semibold text-kpi-reject-text">{error}</p> : null}
       <button
         type="submit"
