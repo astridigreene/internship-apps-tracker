@@ -3,6 +3,8 @@ const EVENTS_URL = 'https://www.googleapis.com/calendar/v3/calendars/primary/eve
 export interface CalendarEventInput {
   summary: string
   description: string
+  /** The event's Location field; '' leaves it blank. */
+  location: string
   start: Date
   durationMinutes: number
   /** Who gets the invite (Google emails it via sendUpdates=all). */
@@ -15,6 +17,7 @@ function eventBody(input: CalendarEventInput) {
   return {
     summary: input.summary,
     description: input.description,
+    location: input.location,
     start: { dateTime: input.start.toISOString(), timeZone },
     end: { dateTime: end.toISOString(), timeZone },
     attendees: [{ email: input.attendeeEmail }],

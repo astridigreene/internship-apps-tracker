@@ -4,10 +4,9 @@ import {
   formatDisplayDateTime,
   isExpired,
   parseSheetDate,
-  toDateInputValue,
-  toDateTimeInputValue,
 } from '../lib/time'
 import { DeleteButton, UnlinkedNote } from './EntryControls'
+import { assessmentFormFromEntry } from '../lib/assessmentForm'
 
 interface AssessmentPanelProps {
   kind: 'OA' | 'HireVue'
@@ -31,22 +30,6 @@ const EMPTY = (company: string): NewAssessmentInput => ({
   site: '',
   scheduled: '',
 })
-
-/** An entry's sheet values in the shapes the form inputs expect. */
-function formFromEntry(entry: AssessmentEntry): NewAssessmentInput {
-  const deadline = parseSheetDate(entry.deadline)
-  const offered = parseSheetDate(entry.dateOffered)
-  const scheduled = parseSheetDate(entry.scheduled)
-  return {
-    company: entry.company,
-    deadline: deadline ? toDateTimeInputValue(deadline) : entry.deadline,
-    auto: entry.auto,
-    dateOffered: offered ? toDateInputValue(offered) : entry.dateOffered,
-    lengthMinutes: entry.lengthMinutes,
-    site: entry.site,
-    scheduled: scheduled ? toDateTimeInputValue(scheduled) : entry.scheduled,
-  }
-}
 
 export function AssessmentPanel({
   kind,
@@ -88,7 +71,7 @@ export function AssessmentPanel({
     setAdding(false)
     setEditing(entry)
     setError(null)
-    setForm(formFromEntry(entry))
+    setForm(assessmentFormFromEntry(entry))
   }
 
   async function handleSubmit(event: FormEvent) {

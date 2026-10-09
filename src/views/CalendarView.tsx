@@ -1,9 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import type { Application, ApplicationStatus, LinkedActions, TrackerData } from '../types'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import type { Application, ApplicationStatus, AssessmentEntry, LinkedActions, TrackerData } from '../types'
 import { ApplicationDetailModal } from '../components/ApplicationDetailModal'
+import { assessmentFormFromEntry } from '../lib/assessmentForm'
+import { SearchSelect, type SearchSelectOption } from '../components/SearchSelect'
 import { linkedApplicationFor, linkedEntriesForApplication } from '../lib/sheet'
 import {
   endMoment,
+  formatDisplayDateTime,
   formatTimeOfDay,
   hasMeetingEnded,
   isExpired,
@@ -11,6 +14,7 @@ import {
   parseSheetDate,
   startOfDay,
   startOfMonth,
+  toDateInputValue,
 } from '../lib/time'
 import type { StatusEditChange } from './ApplicationsView'
 
@@ -171,10 +175,136 @@ function isPast(item: CalendarItem, now: Date): boolean {
   return item.done || isExpired(item.end ?? item.start, now)
 }
 
+const entryKey = (entry: AssessmentEntry) => `${entry.kind}-${entry.sheetRow}`
+
+/** Pick a pending OA/HireVue and a time on `day` to do it (sets its Scheduled For, which sends the invite). */
+function ScheduleAssessmentForm({
+  day,
+  data,
+  disabled,
+  onSave,
+  onDone,
+}: {
+  day: Date
+  data: TrackerData
+  disabled?: boolean
+  onSave: (entry: AssessmentEntry, input: ReturnType<typeof assessmentFormFromEntry>) => Promise<void>
+  onDone: () => void
+}) {
+  const [key, setKey] = useState<string | null>(null)
+  const [time, setTime] = useState('')
+  const [length, setLength] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+
+  const pending = useMemo(
+    () =>
+      [...data.oaEntries, ...data.hireVueEntries]
+        .filter((entry) => !entry.complete)
+        .sort(
+          (a, b) =>
+            (parseSheetDate(a.deadline)?.getTime() ?? Infinity) - (parseSheetDate(b.deadline)?.getTime() ?? Infinity),
+        ),
+    [data.oaEntries, data.hireVueEntries],
+  )
+  const options: SearchSelectOption[] = pending.map((entry) => {
+    const app = linkedApplicationFor(entry, data.applications)
+    return {
+      value: entryKey(entry),
+      label: `${entry.company || 'Untitled'} — ${entry.kind}`,
+      detail: [
+        app?.role,
+        entry.deadline ? `due ${formatDisplayDateTime(entry.deadline) || entry.deadline}` : '',
+        entry.lengthMinutes ? `${entry.lengthMinutes} min` : '',
+        entry.scheduled ? `scheduled ${formatDisplayDateTime(entry.scheduled) || entry.scheduled}` : '',
+      ]
+        .filter(Boolean)
+        .join(' · '),
+      keywords: entry.site,
+    }
+  })
+  const selected = pending.find((entry) => entryKey(entry) === key) ?? null
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault()
+    if (!selected || !time) {
+      setError('Pick an OA/HireVue and a time.')
+      return
+    }
+    setSubmitting(true)
+    setError(null)
+    try {
+      await onSave(selected, {
+        ...assessmentFormFromEntry(selected),
+        lengthMinutes: length.trim(),
+        scheduled: `${toDateInputValue(day)}T${time}`,
+      })
+      onDone()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not schedule it')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const fieldClass =
+    'h-8 w-full rounded border border-app-border bg-app-surface px-2 text-[12px] font-semibold text-app-text outline-none focus:border-app-brand'
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-2 border-b border-app-border px-3 py-2.5">
+      <label className="block text-[10px] font-bold uppercase text-app-text-weak">
+        OA / HireVue
+        <SearchSelect
+          options={options}
+          value={key}
+          onChange={(value) => {
+            setKey(value)
+            const entry = pending.find((e) => entryKey(e) === value)
+            setLength(entry?.lengthMinutes ?? '')
+          }}
+          placeholder="Search by company or role…"
+          emptyText={pending.length ? 'No matches' : 'No pending OAs or HireVues'}
+          disabled={disabled}
+        />
+      </label>
+      <div className="grid grid-cols-2 gap-1.5">
+        <label className="text-[10px] font-bold uppercase text-app-text-weak">
+          Time
+          <input
+            type="time"
+            required
+            value={time}
+            onChange={(e) => setTime(e.target.value)}
+            className={fieldClass}
+          />
+        </label>
+        <label className="text-[10px] font-bold uppercase text-app-text-weak">
+          Length (minutes)
+          <input
+            inputMode="numeric"
+            value={length}
+            onChange={(e) => setLength(e.target.value)}
+            className={fieldClass}
+          />
+        </label>
+      </div>
+      {error ? <p className="text-[11px] font-semibold text-kpi-reject-text">{error}</p> : null}
+      <button
+        type="submit"
+        disabled={disabled || submitting}
+        className="h-8 w-full rounded bg-app-brand text-[12px] font-bold text-white hover:bg-app-brand-dark disabled:opacity-50 dark:text-teal-950"
+      >
+        {submitting ? 'Scheduling…' : 'Schedule & send invite'}
+      </button>
+    </form>
+  )
+}
+
 export function CalendarView({ data, saving, onSaveStatusChanges, linkedActions }: CalendarViewProps) {
   const [month, setMonth] = useState(() => startOfMonth())
   const [selectedDay, setSelectedDay] = useState<Date | null>(null)
   const [detailApp, setDetailApp] = useState<Application | null>(null)
+  const [scheduling, setScheduling] = useState(false)
 
   const items = useMemo(() => buildItems(data), [data])
 
@@ -235,6 +365,7 @@ export function CalendarView({ data, saving, onSaveStatusChanges, linkedActions 
   function shiftMonth(delta: number) {
     setMonth((m) => new Date(m.getFullYear(), m.getMonth() + delta, 1))
     setSelectedDay(null)
+    setScheduling(false)
   }
 
   return (
@@ -319,7 +450,10 @@ export function CalendarView({ data, saving, onSaveStatusChanges, linkedActions 
                 <button
                   key={day.getTime()}
                   type="button"
-                  onClick={() => setSelectedDay(isSelected ? null : day)}
+                  onClick={() => {
+                    setSelectedDay(isSelected ? null : day)
+                    setScheduling(false)
+                  }}
                   aria-pressed={isSelected}
                   aria-label={`${day.toDateString()}, ${dayItems.length} item${dayItems.length === 1 ? '' : 's'}`}
                   className={[
@@ -373,21 +507,50 @@ export function CalendarView({ data, saving, onSaveStatusChanges, linkedActions 
           </div>
         </section>
 
-        <section className="overflow-hidden rounded-xl border border-panel-border bg-app-surface lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:rounded-md">
-          <div className="flex items-center justify-between border-b border-app-border bg-app-muted px-3 py-2">
-            <h2 className="text-[12px] font-bold text-app-text">{agendaTitle}</h2>
+        {/* No overflow-hidden here: the OA search dropdown has to be able to hang past short content. */}
+        <section className="rounded-xl border border-panel-border bg-app-surface lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:rounded-md">
+          <div className="flex items-center justify-between gap-2 rounded-t-xl border-b border-app-border bg-app-muted px-3 py-2 lg:rounded-t-md">
+            <h2 className="min-w-0 truncate text-[12px] font-bold text-app-text">{agendaTitle}</h2>
             {selectedDay ? (
-              <button
-                type="button"
-                onClick={() => setSelectedDay(null)}
-                className="text-[11px] font-bold text-app-brand hover:underline"
-              >
-                Show upcoming
-              </button>
+              <div className="flex shrink-0 items-center gap-3 whitespace-nowrap">
+                {linkedActions ? (
+                  <button
+                    type="button"
+                    onClick={() => setScheduling((s) => !s)}
+                    className="text-[11px] font-bold text-app-brand hover:underline"
+                  >
+                    {scheduling ? 'Cancel' : '+ Schedule'}
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedDay(null)
+                    setScheduling(false)
+                  }}
+                  className="text-[11px] font-bold text-app-brand hover:underline"
+                >
+                  All upcoming
+                </button>
+              </div>
             ) : (
               <span className="text-[11px] font-bold text-app-text-weak tabular-nums">{agenda.length}</span>
             )}
           </div>
+          {selectedDay && scheduling && linkedActions ? (
+            <ScheduleAssessmentForm
+              day={selectedDay}
+              data={data}
+              disabled={saving}
+              onSave={linkedActions.editAssessment}
+              onDone={() => setScheduling(false)}
+            />
+          ) : null}
+          {!selectedDay && linkedActions ? (
+            <p className="border-b border-app-border px-3 py-1.5 text-[11px] font-semibold text-app-text-weak">
+              Click a day to schedule a time for an OA or HireVue.
+            </p>
+          ) : null}
           {agenda.length === 0 ? (
             <p className="px-3 py-6 text-center text-[13px] font-semibold text-app-text-weak">
               {selectedDay ? 'Nothing on this day.' : 'Nothing coming up.'}

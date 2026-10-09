@@ -86,9 +86,17 @@ import {
   type StatusEditChange,
 } from './views/ApplicationsView'
 
+const VIEW_IDS: ViewId[] = ['dashboard', 'applications', 'inProgress', 'calendar']
+
+/** The tab named in the URL hash (e.g. #calendar), so a reload stays where you were. */
+function viewFromHash(): ViewId {
+  const hash = window.location.hash.slice(1)
+  return (VIEW_IDS as string[]).includes(hash) ? (hash as ViewId) : 'dashboard'
+}
+
 export default function App() {
   const config = getConfig()
-  const [view, setView] = useState<ViewId>('dashboard')
+  const [view, setView] = useState<ViewId>(viewFromHash)
   const [applicationsFilter, setApplicationsFilter] =
     useState<ApplicationsStatusFilter>('Active')
   /** Bumped when opening Apps via nav/tab so search + local UI state reset. */
@@ -111,6 +119,14 @@ export default function App() {
   const [sheetSetupError, setSheetSetupError] = useState<SheetSetupError | null>(null)
   /** Interviews already auto-marked Complete this session, so un-marking one by hand sticks. */
   const autoCompletedRef = useRef(new Set<string>())
+
+  // Mirror the tab into the URL hash (replace, not push, so Back still leaves the site).
+  useEffect(() => {
+    const hash = view === 'dashboard' ? '' : `#${view}`
+    if (window.location.hash !== hash) {
+      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${hash}`)
+    }
+  }, [view])
 
   const resolveSheetId = useCallback(
     (email: string, explicit?: string | null) => {
@@ -758,6 +774,8 @@ export default function App() {
       ]
         .filter((line, i, lines) => line || lines[i + 1])
         .join('\n'),
+      // Where you'll take it — the Site (platform or link) — so it's one tap from the event
+      location: entry.site,
       start,
       durationMinutes: Number.isFinite(length) && length > 0 ? length : 60,
       attendeeEmail: config.calendarInviteEmail || user?.email || '',
