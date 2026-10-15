@@ -1,5 +1,26 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { SIMPLIFY_JOBS_URL } from '../types'
+
+const INSTAGRAM_URL = 'https://www.instagram.com/zero2sudo/'
+
+function InstagramButton({ className }: { className: string }) {
+  return (
+    <a
+      href={INSTAGRAM_URL}
+      target="_blank"
+      rel="noreferrer"
+      aria-label="zero2sudo on Instagram"
+      title="@zero2sudo"
+      className={`inline-flex shrink-0 items-center justify-center rounded-full bg-[radial-gradient(circle_at_30%_107%,#fdf497_0%,#fdf497_5%,#fd5949_45%,#d6249f_60%,#285AEB_90%)] text-white shadow-sm ring-1 ring-white/40 transition-transform hover:scale-110 ${className}`}
+    >
+      <svg viewBox="0 0 24 24" className="h-[58%] w-[58%]" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
+        <rect x="3" y="3" width="18" height="18" rx="5" />
+        <circle cx="12" cy="12" r="4" />
+        <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
+      </svg>
+    </a>
+  )
+}
 import { BrandMark } from './BrandMark'
 
 interface TopBarProps {
@@ -97,6 +118,7 @@ export function TopBar({
           >
             Apply
           </a>
+          <InstagramButton className="h-10 w-10" />
           {onRefresh ? (
             <button
               type="button"
@@ -205,6 +227,7 @@ export function TopBar({
           >
             Apply
           </a>
+          <InstagramButton className="h-7 w-7" />
           <span className="hidden xl:inline">{formatSynced(lastSynced)}</span>
           {userEmail ? (
             <span className="hidden max-w-[140px] truncate 2xl:inline">{userEmail}</span>

@@ -1,9 +1,7 @@
 import { useMemo } from 'react'
 import type { Application, AssessmentEntry, InterviewEntry } from '../types'
-import { endMoment, formatDueInDays, isExpired, isSameDay, parseSheetDate } from '../lib/time'
+import { endMoment, formatDueInDays, isExpired, parseSheetDate } from '../lib/time'
 import { linkedApplicationFor } from '../lib/sheet'
-
-const DAILY_APPLY_GOAL = 3
 
 interface PendingItem {
   key: string
@@ -21,7 +19,6 @@ interface ToDoCardProps {
   applications: Application[]
   onOpenAll?: () => void
   onSelectApplication?: (app: Application) => void
-  onApplyClick?: () => void
 }
 
 export function ToDoCard({
@@ -31,7 +28,6 @@ export function ToDoCard({
   applications,
   onOpenAll,
   onSelectApplication,
-  onApplyClick,
 }: ToDoCardProps) {
   const pending = useMemo(() => {
     const assessments: PendingItem[] = [...oaEntries, ...hireVueEntries]
@@ -66,16 +62,7 @@ export function ToDoCard({
     })
   }, [oaEntries, hireVueEntries, interviewEntries, applications])
 
-  const appliedToday = useMemo(() => {
-    const today = new Date()
-    return applications.filter((app) => {
-      const applied = parseSheetDate(app.dateApplied)
-      return applied ? isSameDay(applied, today) : false
-    }).length
-  }, [applications])
-
-  const remainingApplies = Math.max(0, DAILY_APPLY_GOAL - appliedToday)
-  const totalCount = (remainingApplies > 0 ? 1 : 0) + pending.length
+  const totalCount = pending.length
 
   return (
     <div className="flex flex-col overflow-hidden rounded-md border border-kpi-oa-border bg-kpi-oa-bg lg:h-full lg:min-h-0">
@@ -101,26 +88,6 @@ export function ToDoCard({
         </p>
       ) : (
         <ul className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
-          {remainingApplies > 0 ? (
-            <li className="last:border-b-0">
-              <button
-                type="button"
-                disabled={!onApplyClick}
-                onClick={onApplyClick}
-                className={[
-                  'flex w-full items-center justify-between gap-2 border-b border-kpi-oa-border/40 px-3 py-3 text-left lg:px-2.5 lg:py-1.5',
-                  onApplyClick ? 'cursor-pointer hover:bg-kpi-oa-border/15' : 'cursor-default',
-                ].join(' ')}
-              >
-                <p className="min-w-0 truncate text-[14px] font-semibold text-kpi-oa-text lg:text-[12px]">
-                  Apply to {remainingApplies} more job{remainingApplies === 1 ? '' : 's'} today
-                </p>
-                <p className="shrink-0 text-[12px] font-semibold tabular-nums text-kpi-oa-text lg:text-[11px]">
-                  {appliedToday}/{DAILY_APPLY_GOAL}
-                </p>
-              </button>
-            </li>
-          ) : null}
           {pending.map((entry) => {
             const deadline = parseSheetDate(entry.when)
             const dueLabel =

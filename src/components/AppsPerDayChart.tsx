@@ -33,11 +33,8 @@ type DayPoint = {
   isFuture: boolean
 }
 
-type PaceVerdict = 'crushing' | 'onTrack' | 'behind' | 'slacking'
-
-/** Daily application goal. Crushing it = goal + 1 or more. */
+/** Daily application goal. */
 const GOAL = 3
-const GOAL_CRUSHING = GOAL + 1
 
 function usePrefersDark() {
   const [dark, setDark] = useState(() =>
@@ -199,88 +196,6 @@ function trendLabel(direction: TrendDirection): string {
   return 'holding flat'
 }
 
-function buildRecommendation(args: {
-  avgSoFar: number
-  totalSoFar: number
-  daysElapsed: number
-  daysRemaining: number
-  zeroStreak: number
-  todayCount: number
-}): { verdict: PaceVerdict; headline: string; detail: string } {
-  const { avgSoFar, totalSoFar, daysElapsed, daysRemaining, zeroStreak, todayCount } = args
-  const neededForFloor = Math.max(0, Math.ceil(GOAL * (daysElapsed + daysRemaining) - totalSoFar))
-  const neededPerDay =
-    daysRemaining > 0 ? neededForFloor / daysRemaining : neededForFloor > 0 ? Infinity : 0
-
-  if (daysElapsed === 0) {
-    return {
-      verdict: 'onTrack',
-      headline: 'Range starts today',
-      detail: `Hit ${GOAL} apps today to stay on pace.`,
-    }
-  }
-
-  if (zeroStreak >= 3 && avgSoFar < GOAL) {
-    return {
-      verdict: 'slacking',
-      headline: `${zeroStreak} days with zero apps`,
-      detail:
-        neededForFloor > 0
-          ? `That's a dry spell. You need ~${neededPerDay.toFixed(1)}/day for the rest of this range just to salvage a ${GOAL}/day average.`
-          : 'Open the sheet and send something before the day ends.',
-    }
-  }
-
-  if (avgSoFar >= GOAL_CRUSHING) {
-    return {
-      verdict: 'crushing',
-      headline: `${avgSoFar.toFixed(1)}/day — above the goal`,
-      detail:
-        todayCount === 0 && daysRemaining >= 0
-          ? `Strong pace. Still worth landing ${GOAL}+ today so the streak doesn't break.`
-          : `You're clearing the ${GOAL}/day goal. Keep the machine fed.`,
-    }
-  }
-
-  if (avgSoFar >= GOAL) {
-    return {
-      verdict: 'onTrack',
-      headline: `${avgSoFar.toFixed(1)}/day — on goal`,
-      detail:
-        todayCount === 0
-          ? `Goal held so far. One more today keeps you honest.`
-          : `Solid. Push past ${GOAL}/day when you have bandwidth.`,
-    }
-  }
-
-  if (avgSoFar > 0) {
-    return {
-      verdict: 'behind',
-      headline: `${avgSoFar.toFixed(1)}/day — below ${GOAL}/day`,
-      detail:
-        daysRemaining > 0 && neededForFloor > 0
-          ? `Behind goal. About ${neededPerDay.toFixed(1)} apps/day for the remaining ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} to hit a ${GOAL}/day average.`
-          : `Finished this range under goal (${totalSoFar} apps across ${daysElapsed} days).`,
-    }
-  }
-
-  return {
-    verdict: 'slacking',
-    headline: 'Zero apps in this range',
-    detail:
-      daysRemaining > 0
-        ? `Nothing logged. You need ${GOAL} today just to start existing on the chart.`
-        : 'Empty range. Either widen the dates or apply to something.',
-  }
-}
-
-const VERDICT_CLASS: Record<PaceVerdict, string> = {
-  crushing: 'border-kpi-offer-border bg-kpi-offer-bg text-kpi-offer-text',
-  onTrack: 'border-kpi-applied-border bg-kpi-applied-bg text-kpi-applied-text',
-  behind: 'border-kpi-interview-border bg-kpi-interview-bg text-kpi-interview-text',
-  slacking: 'border-kpi-reject-border bg-kpi-reject-bg text-kpi-reject-text',
-}
-
 const fieldClass =
   'h-7 w-[6.5rem] rounded-md border border-app-border bg-app-surface px-2 text-[12px] text-app-text tabular-nums placeholder:text-app-text-weak/50 focus:border-app-brand focus:outline-none lg:h-6 lg:text-[11px]'
 
@@ -416,14 +331,13 @@ export function AppsPerDayChart({ applications }: AppsPerDayChartProps) {
 
   const counts = useMemo(() => countByDayKey(applications), [applications])
 
-  const { chartData, stats, recommendation, trend, canProject, rangeValid } = useMemo(() => {
+  const { chartData, stats, trend, canProject, rangeValid } = useMemo(() => {
     const fromDate = startOfDay(rangeFrom)
     const toDate = startOfDay(rangeTo)
     if (fromDate.getTime() > toDate.getTime()) {
       return {
         chartData: [] as DayPoint[],
         stats: null,
-        recommendation: null,
         trend: null as RangeTrend | null,
         canProject: false,
         rangeValid: false,
@@ -476,27 +390,9 @@ export function AppsPerDayChart({ applications }: AppsPerDayChartProps) {
       totalSoFar += counts.get(toDateInputValue(day)) ?? 0
     }
 
-    let zeroStreak = 0
-    for (let i = elapsedDays.length - 1; i >= 0; i -= 1) {
-      const count = counts.get(toDateInputValue(elapsedDays[i]!)) ?? 0
-      if (count === 0) {
-        zeroStreak += 1
-      } else {
-        break
-      }
-    }
-
     const daysElapsed = elapsedDays.length
     const avgSoFar = daysElapsed > 0 ? totalSoFar / daysElapsed : 0
     const todayCount = counts.get(toDateInputValue(today)) ?? 0
-    const rec = buildRecommendation({
-      avgSoFar,
-      totalSoFar,
-      daysElapsed,
-      daysRemaining: remainingInRange.length,
-      zeroStreak,
-      todayCount,
-    })
 
     return {
       chartData: points,
@@ -507,7 +403,6 @@ export function AppsPerDayChart({ applications }: AppsPerDayChartProps) {
         daysRemaining: remainingInRange.length,
         todayCount,
       },
-      recommendation: rec,
       trend: rangeTrend,
       canProject: rangeTrend != null,
       rangeValid: true,
@@ -682,21 +577,13 @@ export function AppsPerDayChart({ applications }: AppsPerDayChartProps) {
         </div>
       </div>
 
-      {recommendation && stats ? (
-        <div
-          className={`mx-3 mt-2 rounded-md border px-2.5 py-1.5 lg:mx-2.5 ${VERDICT_CLASS[recommendation.verdict]}`}
-        >
-          <p className="text-[12px] font-semibold lg:text-[11px]">{recommendation.headline}</p>
-          <p className="mt-0.5 text-[11px] leading-snug opacity-90 lg:text-[10px]">
-            {recommendation.detail}
-          </p>
-          <p className="mt-1 text-[10px] tabular-nums opacity-70 lg:text-[9px]">
-            {stats.totalSoFar} apps · {stats.avgSoFar.toFixed(2)}/day avg
-            {showProjection && trend != null
-              ? ` · ${trendLabel(trend.direction)} (${trend.slope >= 0 ? '+' : ''}${trend.slope.toFixed(2)}/day over last ${trend.sampleDays}d)`
-              : ''}
-          </p>
-        </div>
+      {stats ? (
+        <p className="mx-3 mt-2 text-[10px] tabular-nums text-app-text-weak lg:mx-2.5 lg:text-[9px]">
+          {stats.totalSoFar} apps · {stats.avgSoFar.toFixed(2)}/day avg
+          {showProjection && trend != null
+            ? ` · ${trendLabel(trend.direction)} (${trend.slope >= 0 ? '+' : ''}${trend.slope.toFixed(2)}/day over last ${trend.sampleDays}d)`
+            : ''}
+        </p>
       ) : null}
 
       <div

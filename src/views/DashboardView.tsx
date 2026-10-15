@@ -208,7 +208,6 @@ export function DashboardView({
             applications={data.applications}
             onOpenAll={onOpenInProgress}
             onSelectApplication={setDetailApp}
-            onApplyClick={() => setNewOpen(true)}
           />
         </div>
         <div className="lg:col-span-5 lg:min-h-0">
