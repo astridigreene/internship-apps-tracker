@@ -6,6 +6,8 @@
  *  - list of pending OA/HireVue entries (Complete = No, deadline not yet passed)
  *    from the "<year> OA" and "<year> HireVue" sibling tabs, sorted by Deadline
  *
+ * Skips the email entirely on days with nothing pending.
+ *
  * Setup (one-time):
  * 1. Open your tracker spreadsheet → Extensions → Apps Script.
  * 2. Add a new script file and paste this file (or replace Code.gs).
@@ -68,16 +70,19 @@ function sendDailyReminderEmail() {
   }
 
   var pending = _listPendingAssessments_(spreadsheet, year)
+  if (!pending.length) {
+    Logger.log('Nothing pending — no reminder sent.')
+    return
+  }
+
   var subject =
-    pending.length === 0
-      ? 'Apply tonight · nothing pending (' + year + ')'
-      : 'Apply tonight · ' +
-        pending.length +
-        ' item' +
-        (pending.length === 1 ? '' : 's') +
-        ' pending (' +
-        year +
-        ')'
+    'Apply tonight · ' +
+    pending.length +
+    ' item' +
+    (pending.length === 1 ? '' : 's') +
+    ' pending (' +
+    year +
+    ')'
 
   var html = _buildEmailHtml_(year, pending)
   var text = _buildEmailText_(year, pending)
