@@ -39,6 +39,8 @@ jobs:
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
           # Optional repo variable; invites go to the signed-in account when unset.
           VITE_CALENDAR_INVITE_EMAIL: ${{ vars.CALENDAR_INVITE_EMAIL }}
+          # Optional repo variable; default sheet for the NeetCode tab (read/written via the user's OAuth token).
+          VITE_NEETCODE_SHEET_ID: ${{ vars.NEETCODE_SHEET_ID }}
           # Same classic PAT as Actions secret GH_PAT (repo scope). Baked into the
           # static site only to fire repository_dispatch — never sends sheet rows.
           VITE_GH_PAT: ${{ secrets.GH_PAT }}

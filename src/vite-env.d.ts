@@ -3,6 +3,8 @@
 interface ImportMetaEnv {
   readonly VITE_GOOGLE_CLIENT_ID: string
   readonly VITE_SHEET_ID?: string
+  /** Default NeetCode Tracker spreadsheet (Checklist / Next Up / Capacity tabs). */
+  readonly VITE_NEETCODE_SHEET_ID?: string
   /** Email that receives calendar invites for scheduled OA/HireVue times (defaults to the signed-in account). */
   readonly VITE_CALENDAR_INVITE_EMAIL?: string
   readonly VITE_BASE_PATH: string

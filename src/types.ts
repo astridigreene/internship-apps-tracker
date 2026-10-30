@@ -339,7 +339,63 @@ export interface TrackerData {
  */
 export class SavedWithWarningError extends Error {}
 
-export type ViewId = 'dashboard' | 'applications' | 'inProgress' | 'calendar'
+export type ViewId = 'dashboard' | 'applications' | 'inProgress' | 'calendar' | 'neetcode'
+
+export type NeetCodeDifficulty = 'E' | 'M' | 'H'
+
+/** Bucketed from the Checklist's Status formula (Done / On track / Ahead N d / Behind +N d / Needs more time). */
+export type NeetCodeStatusKind = 'done' | 'onTrack' | 'ahead' | 'behind' | 'needsTime' | 'noSlot' | 'other'
+
+export interface NeetCodeProblem {
+  /** 1-based row on the Checklist tab — what write-back targets. */
+  sheetRow: number
+  number: number | null
+  name: string
+  category: string
+  difficulty: NeetCodeDifficulty | ''
+  minutes: number | null
+  done: boolean
+  /** The Done cell held a real checkbox (boolean), so un-ticking writes FALSE rather than clearing it. */
+  doneIsCheckbox: boolean
+  /** ISO dates (YYYY-MM-DD), null when the sheet left them blank (e.g. no capacity slot). */
+  originalDeadline: string | null
+  plannedDate: string | null
+  /** Status text exactly as the sheet computed it. */
+  status: string
+  statusKind: NeetCodeStatusKind
+}
+
+export interface NeetCodeStudyDay {
+  /** ISO date, or null when the sheet has no upcoming study day. */
+  date: string | null
+  /** Raw cell text when it isn't a date (e.g. a message to add days). */
+  label: string
+  /** Problems listed for that day, matched back to Checklist rows when possible. */
+  problems: { label: string; problem: NeetCodeProblem | null }[]
+}
+
+export interface NeetCodeProgress {
+  done: number
+  total: number
+  remaining: number | null
+  remainingMinutes: number | null
+  originalFinish: string | null
+  projectedFinish: string | null
+  /** Raw text for projected finish when it isn't a date. */
+  projectedFinishLabel: string
+  problemsBehind: number | null
+  extraMinutesNeeded: number | null
+  extraMinutesPerStudyDay: number | null
+}
+
+export interface NeetCodeData {
+  lastSynced: string
+  problems: NeetCodeProblem[]
+  /** Column letter of the Checklist's Done column (F in the template). */
+  doneColumn: string
+  nextDays: NeetCodeStudyDay[]
+  progress: NeetCodeProgress
+}
 
 /** Bundled CRUD handlers for the OA/HireVue/Interviews/Screening linked tabs. */
 export interface LinkedActions {

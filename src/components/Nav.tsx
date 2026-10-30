@@ -10,6 +10,7 @@ const NAV_ITEMS: { id: ViewId; label: string }[] = [
   { id: 'applications', label: 'Applications' },
   { id: 'inProgress', label: 'In Progress' },
   { id: 'calendar', label: 'Calendar' },
+  { id: 'neetcode', label: 'NeetCode' },
 ]
 
 export function Nav({ active, onNavigate }: NavProps) {

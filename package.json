@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:neetcode": "node scripts/neetcodeParse.test.ts"
   },
   "dependencies": {
     "canvas-confetti": "^1.9.4",

@@ -5,14 +5,17 @@ interface MobileTabBarProps {
   onNavigate: (view: ViewId) => void
 }
 
-const TABS: { id: ViewId; label: string; icon: 'home' | 'list' | 'progress' | 'calendar' }[] = [
+type TabIconName = 'home' | 'list' | 'progress' | 'calendar' | 'code'
+
+const TABS: { id: ViewId; label: string; icon: TabIconName }[] = [
   { id: 'dashboard', label: 'Home', icon: 'home' },
   { id: 'applications', label: 'Apps', icon: 'list' },
   { id: 'inProgress', label: 'Progress', icon: 'progress' },
   { id: 'calendar', label: 'Calendar', icon: 'calendar' },
+  { id: 'neetcode', label: 'NeetCode', icon: 'code' },
 ]
 
-function TabIcon({ icon, active }: { icon: 'home' | 'list' | 'progress' | 'calendar'; active: boolean }) {
+function TabIcon({ icon, active }: { icon: TabIconName; active: boolean }) {
   const stroke = active ? 'currentColor' : 'currentColor'
   if (icon === 'home') {
     return (
@@ -31,6 +34,19 @@ function TabIcon({ icon, active }: { icon: 'home' | 'list' | 'progress' | 'calen
       <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden>
         <path
           d="M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1ZM4 10h16M8 3v4M16 3v4"
+          stroke={stroke}
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    )
+  }
+  if (icon === 'code') {
+    return (
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden>
+        <path
+          d="m8 7-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"
           stroke={stroke}
           strokeWidth="2"
           strokeLinecap="round"
@@ -71,7 +87,7 @@ export function MobileTabBar({ active, onNavigate }: MobileTabBarProps) {
       style={{ paddingBottom: 'max(0.35rem, env(safe-area-inset-bottom))' }}
       aria-label="Primary"
     >
-      <div className="grid grid-cols-4 gap-1 px-2 pt-1">
+      <div className="grid grid-cols-5 gap-1 px-2 pt-1">
         {TABS.map((tab) => {
           const isActive = active === tab.id
           return (

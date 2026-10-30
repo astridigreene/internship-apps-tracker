@@ -31,6 +31,7 @@ Your application rows stay in **your** Google Sheet. The site does not store you
 - **Schedule an OA/HireVue** — set a "Do it at" time on an entry and the app creates a Google Calendar event and sends an invite (to `VITE_CALENDAR_INVITE_EMAIL`, or your signed-in account); editing or deleting the entry updates or cancels the event. Needs the **Google Calendar API** enabled in the OAuth client's Cloud project
 - **Sheet setup help** — if headers/tabs are wrong, the app shows which columns to add instead of failing silently
 - **Dark mode** follows system preference
+- **NeetCode tab** — progress, next two study days, and the full 150-problem checklist from a separate NeetCode Tracker sheet; tick problems done right from the page (see [NeetCode tab](#neetcode-tab))
 
 ### Expected columns (row 1 of a year tab)
 
@@ -132,6 +133,61 @@ Site URL is typically `https://<owner>.github.io/<repo>/`.
 Add the same Pages origin under your OAuth client’s authorized JavaScript origins.
 
 > Vite embeds `VITE_*` values into the client bundle. That is normal for an OAuth **client ID**. Never put service-account private keys, refresh tokens, or PATs in any `VITE_*` variable or in git.
+
+---
+
+## NeetCode tab
+
+The **NeetCode** tab reads a second Google Sheet, the *NeetCode Tracker*, the same way the
+rest of the dashboard reads your applications: directly from the browser with your Google
+sign-in. There's no Apps Script export, no GitHub Action, and no JSON committed to the repo.
+
+**All scheduling stays in the sheet.** Planned dates, statuses, projected finish and the
+extra-minutes figures are whatever the sheet's formulas compute; the page only displays them.
+
+### Sheet layout
+
+| Tab | What the page reads |
+| --- | --- |
+| `Checklist` | Row 1 headers: `#`, `Problem`, `Category`, `Diff` (E/M/H), `Min`, `Done` (checkbox or `x`), `Original deadline`, `Planned date`, `Status`. Matched by header name, so extra columns (like the helper column) are fine. |
+| `Next Up` | Labels in column A, values in column B: `Next study day`, `Following study day`, and the Progress block (`Done`, `Remaining`, `Remaining minutes`, `Original finish deadline`, `Projected finish`, `Problems behind schedule`, `Extra minutes needed…`, `…extra min per study day`). Problem lists sit under `Do on next study day` / `Do on following study day`. |
+| `Capacity` | Not read directly; it feeds the formulas above. |
+
+### Sheet ID
+
+The sheet ID is the long part of the URL: `docs.google.com/spreadsheets/d/<SHEET_ID>/edit`.
+
+- **Deployed site:** add a repo **variable** (Settings → Secrets and variables → Actions →
+  Variables) named `NEETCODE_SHEET_ID`. `deploy.yml` passes it to the build as
+  `VITE_NEETCODE_SHEET_ID`.
+- **Local dev:** set `VITE_NEETCODE_SHEET_ID=<SHEET_ID>` in `.env.local`.
+- **Without either:** the NeetCode tab asks you to paste the sheet URL, and remembers it in
+  this browser for your Google account. *Use a different sheet* (shown on the error screen)
+  clears it.
+
+The ID isn't a secret: only Google accounts that can open the sheet can load or change it.
+
+### Ticking problems (write-back)
+
+Ticking a checkbox (in *Next up* or the table) writes `TRUE` to that row's `Done` cell
+(column F in the template) through the Sheets API, using your sign-in's existing
+`spreadsheets` scope. Unticking writes `FALSE` to a checkbox cell, or clears a cell that
+held a typed `x`. After the write, the page re-reads both tabs so the recalculated planned
+dates show up. If a write fails, the row snaps back and an error appears with an
+*Open in Sheets* link.
+
+**No token is needed.** A shared secret would have to be shipped in the public JS bundle,
+so this tab relies on Google OAuth instead: you can only write to the sheet if your Google
+account has edit access to it.
+
+### Empty and error states
+
+- Sheet unreachable or not shared with you → error panel with *Retry* / *Use a different sheet*.
+- Missing tab or `Checklist` columns → the page lists what to fix.
+- Problems with no planned date (ran out of `Capacity` rows) → banner: add days to `Capacity`.
+- No upcoming study day → the *Next up* card says to add days to `Capacity`.
+
+Parser checks: `npm run test:neetcode`.
 
 ---
 

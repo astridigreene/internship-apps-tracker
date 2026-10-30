@@ -82,13 +82,14 @@ import { YearTabs } from './components/YearTabs'
 import { DashboardView } from './views/DashboardView'
 import { InProgressView } from './views/InProgressView'
 import { CalendarView } from './views/CalendarView'
+import { NeetCodeView } from './views/NeetCodeView'
 import {
   ApplicationsView,
   type ApplicationsStatusFilter,
   type StatusEditChange,
 } from './views/ApplicationsView'
 
-const VIEW_IDS: ViewId[] = ['dashboard', 'applications', 'inProgress', 'calendar']
+const VIEW_IDS: ViewId[] = ['dashboard', 'applications', 'inProgress', 'calendar', 'neetcode']
 
 /** The tab named in the URL hash (e.g. #calendar), so a reload stays where you were. */
 function viewFromHash(): ViewId {
@@ -1390,7 +1391,7 @@ export default function App() {
         }}
         refreshing={refreshing}
         nav={<Nav active={view} onNavigate={handleNavNavigate} />}
-        yearTabs={yearTabs}
+        yearTabs={view === 'neetcode' ? undefined : yearTabs}
       />
       {error ? (
         <div className="border-b border-app-border bg-kpi-reject-bg px-3 py-2 text-[12px] text-kpi-reject-text lg:py-1 lg:text-[11px]">
@@ -1438,6 +1439,14 @@ export default function App() {
               onDeleteApplication={handleDeleteApplication}
               linkedData={data}
               linkedActions={linkedActions}
+            />
+          </div>
+        ) : view === 'neetcode' ? (
+          <div className="flex flex-1 flex-col lg:min-h-0">
+            <NeetCodeView
+              accessToken={accessToken}
+              userEmail={user.email}
+              defaultSheetId={config.neetcodeSheetId}
             />
           </div>
         ) : view === 'calendar' ? (

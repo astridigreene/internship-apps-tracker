@@ -712,7 +712,7 @@ export async function fetchOptionalSheetValues(
   }
 }
 
-async function putSheetValues(options: {
+export async function putSheetValues(options: {
   spreadsheetId: string
   accessToken: string
   sheetTitle: string
