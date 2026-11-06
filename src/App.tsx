@@ -1422,6 +1422,9 @@ export default function App() {
               onSaveStatusChanges={handleSaveStatusChanges}
               onAddApplication={handleAddApplication}
               linkedActions={linkedActions}
+              accessToken={accessToken}
+              userEmail={user.email}
+              neetcodeSheetId={config.neetcodeSheetId}
             />
           </div>
         ) : view === 'applications' ? (

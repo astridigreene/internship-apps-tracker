@@ -1,20 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import type {
-  NeetCodeData,
   NeetCodeDifficulty,
   NeetCodeProblem,
   NeetCodeStatusKind,
   NeetCodeStudyDay,
 } from '../types'
 import { KpiCard } from '../components/KpiCard'
-import {
-  fetchNeetCodeData,
-  getSavedNeetCodeSheetId,
-  neetcodeSheetUrl,
-  NeetCodeSetupError,
-  saveNeetCodeSheetId,
-  setNeetCodeDone,
-} from '../lib/neetcode'
+import { DiffBadge } from '../components/DiffBadge'
+import { neetcodeSheetUrl } from '../lib/neetcode'
+import { useNeetCode } from '../lib/useNeetCode'
 import { dateFromIso } from '../lib/neetcodeParse'
 import { parseSpreadsheetId } from '../lib/session'
 
@@ -29,13 +23,6 @@ type StatusFilter = 'All' | 'To do' | 'Done' | 'Behind' | 'Ahead' | 'On track' |
 type DiffFilter = 'All' | NeetCodeDifficulty
 
 const STATUS_FILTERS: StatusFilter[] = ['All', 'To do', 'Behind', 'Ahead', 'On track', 'No slot', 'Done']
-const DIFF_LABEL: Record<NeetCodeDifficulty, string> = { E: 'Easy', M: 'Medium', H: 'Hard' }
-
-const DIFF_CLASS: Record<NeetCodeDifficulty, string> = {
-  E: 'bg-status-offer-bg text-status-offer-text',
-  M: 'bg-status-interview-bg text-status-interview-text',
-  H: 'bg-status-rejected-bg text-status-rejected-text',
-}
 
 const STATUS_PILL_CLASS: Record<NeetCodeStatusKind, string> = {
   done: 'bg-app-border/60 text-app-text-weak',
@@ -98,20 +85,6 @@ function statusLabel(problem: NeetCodeProblem): string {
   if (problem.done) return 'Done'
   if (problem.statusKind === 'noSlot') return 'No slot'
   return problem.status || '—'
-}
-
-function DiffBadge({ difficulty }: { difficulty: NeetCodeDifficulty | '' }) {
-  if (!difficulty) {
-    return null
-  }
-  return (
-    <span
-      className={`inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded px-1 text-[11px] font-bold ${DIFF_CLASS[difficulty]}`}
-      title={DIFF_LABEL[difficulty]}
-    >
-      {difficulty}
-    </span>
-  )
 }
 
 function DoneCheckbox({
@@ -470,97 +443,20 @@ function ProblemTable({
 }
 
 export function NeetCodeView({ accessToken, userEmail, defaultSheetId }: NeetCodeViewProps) {
-  const [sheetId, setSheetId] = useState<string | null>(
-    () => getSavedNeetCodeSheetId(userEmail) || defaultSheetId || null,
-  )
-  const [data, setData] = useState<NeetCodeData | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [loadError, setLoadError] = useState<string | null>(null)
-  const [setupError, setSetupError] = useState<NeetCodeSetupError | null>(null)
-  const [writeError, setWriteError] = useState<string | null>(null)
-  /** Sheet row → done value the UI shows while its write + refetch are in flight. */
-  const [pending, setPending] = useState<Map<number, boolean>>(() => new Map())
-  const writeQueue = useRef<Promise<void>>(Promise.resolve())
-  const inFlight = useRef(0)
-
-  const load = useCallback(
-    async (opts?: { quiet?: boolean }): Promise<boolean> => {
-      if (!sheetId) {
-        return false
-      }
-      if (!opts?.quiet) {
-        setLoading(true)
-      }
-      try {
-        const next = await fetchNeetCodeData(sheetId, accessToken)
-        setData(next)
-        setLoadError(null)
-        setSetupError(null)
-        return true
-      } catch (err) {
-        if (err instanceof NeetCodeSetupError) {
-          setSetupError(err)
-        } else {
-          setLoadError(err instanceof Error ? err.message : 'Could not load the NeetCode sheet.')
-        }
-        return false
-      } finally {
-        setLoading(false)
-      }
-    },
-    [sheetId, accessToken],
-  )
-
-  useEffect(() => {
-    void load()
-  }, [load])
-
-  const isChecked = useCallback(
-    (problem: NeetCodeProblem) => pending.get(problem.sheetRow) ?? problem.done,
-    [pending],
-  )
-  const isBusy = useCallback((problem: NeetCodeProblem) => pending.has(problem.sheetRow), [pending])
-
-  function handleToggle(problem: NeetCodeProblem, done: boolean) {
-    if (!sheetId || !data) {
-      return
-    }
-    const { doneColumn } = data
-    setWriteError(null)
-    setPending((prev) => new Map(prev).set(problem.sheetRow, done))
-    inFlight.current += 1
-    // Writes run one at a time; the sheet is refetched once the queue drains so the
-    // planned dates/status reflect every tick.
-    writeQueue.current = writeQueue.current
-      .then(() => setNeetCodeDone({ spreadsheetId: sheetId, accessToken, problem, doneColumn, done }))
-      .catch((err: unknown) => {
-        setWriteError(err instanceof Error ? err.message : 'Could not update the sheet.')
-      })
-      .then(async () => {
-        inFlight.current -= 1
-        if (inFlight.current > 0) {
-          return
-        }
-        await load({ quiet: true })
-        // Drop optimistic values either way: on success the refetch has them, on
-        // failure the row snaps back to what the sheet says.
-        setPending(new Map())
-      })
-  }
-
-  function handleConnect(id: string) {
-    saveNeetCodeSheetId(userEmail, id)
-    setData(null)
-    setSheetId(id)
-  }
-
-  function handleChangeSheet() {
-    saveNeetCodeSheetId(userEmail, null)
-    setData(null)
-    setLoadError(null)
-    setSetupError(null)
-    setSheetId(null)
-  }
+  const {
+    sheetId,
+    data,
+    loading,
+    loadError,
+    setupError,
+    writeError,
+    load,
+    isChecked,
+    isBusy,
+    toggle: handleToggle,
+    connect: handleConnect,
+    disconnect: handleChangeSheet,
+  } = useNeetCode(accessToken, userEmail, defaultSheetId)
 
   const sheetUrl = sheetId ? neetcodeSheetUrl(sheetId) : null
 

@@ -14,6 +14,7 @@ import { DueSoonBanner } from '../components/DueSoonBanner'
 import { AppsPerDayChart } from '../components/AppsPerDayChart'
 import { ApplicationDetailModal } from '../components/ApplicationDetailModal'
 import { NewApplicationModal } from '../components/NewApplicationModal'
+import { useNeetCode } from '../lib/useNeetCode'
 import { applicationForEntry, computeStats, linkedEntriesForApplication } from '../lib/sheet'
 import type { ApplicationsStatusFilter, StatusEditChange } from './ApplicationsView'
 
@@ -26,6 +27,10 @@ interface DashboardViewProps {
   onSaveStatusChanges?: (changes: StatusEditChange[]) => Promise<void>
   onAddApplication?: (application: NewApplicationInput) => Promise<void>
   linkedActions?: LinkedActions
+  /** For the To-Do card's NeetCode rows. */
+  accessToken: string
+  userEmail: string
+  neetcodeSheetId: string
 }
 
 function formatRate(rate: number): string {
@@ -54,7 +59,11 @@ export function DashboardView({
   onSaveStatusChanges,
   onAddApplication,
   linkedActions,
+  accessToken,
+  userEmail,
+  neetcodeSheetId,
 }: DashboardViewProps) {
+  const neetcode = useNeetCode(accessToken, userEmail, neetcodeSheetId)
   const stats = useMemo(() => computeStats(data.applications), [data.applications])
   const [detailApp, setDetailApp] = useState<Application | null>(null)
   const [newOpen, setNewOpen] = useState(false)
@@ -208,6 +217,8 @@ export function DashboardView({
             applications={data.applications}
             onOpenAll={onOpenInProgress}
             onSelectApplication={setDetailApp}
+            linkedActions={linkedActions}
+            neetcode={neetcode}
           />
         </div>
         <div className="lg:col-span-5 lg:min-h-0">
