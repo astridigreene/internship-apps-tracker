@@ -248,7 +248,7 @@ function CategoryProgress({ problems }: { problems: NeetCodeProblem[] }) {
   }, [problems])
 
   return (
-    <div className="rounded-xl border border-panel-border bg-app-surface lg:rounded-md">
+    <div className="shrink-0 rounded-xl border border-panel-border bg-app-surface lg:rounded-md">
       <h2 className="border-b border-app-border px-3 py-2.5 text-[14px] font-bold text-panel-title lg:px-2.5 lg:py-1.5 lg:text-[12px] lg:font-semibold">
         Progress by category
       </h2>
@@ -321,7 +321,7 @@ function ProblemTable({
   }, [problems, category, difficulty, status, sortAsc])
 
   return (
-    <div className="flex flex-col overflow-hidden rounded-xl border border-panel-border bg-app-surface lg:rounded-md">
+    <div className="flex shrink-0 flex-col overflow-hidden rounded-xl border border-panel-border bg-app-surface lg:rounded-md">
       <div className="flex flex-wrap items-center gap-2 border-b border-app-border px-3 py-2.5 lg:px-2.5 lg:py-1.5">
         <h2 className="mr-auto text-[14px] font-bold text-panel-title lg:text-[12px] lg:font-semibold">
           All problems <span className="font-normal text-app-text-weak tabular-nums">· {rows.length}</span>
