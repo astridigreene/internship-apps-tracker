@@ -321,8 +321,8 @@ function ProblemTable({
   }, [problems, category, difficulty, status, sortAsc])
 
   return (
-    <div className="flex shrink-0 flex-col overflow-hidden rounded-xl border border-panel-border bg-app-surface lg:rounded-md">
-      <div className="flex flex-wrap items-center gap-2 border-b border-app-border px-3 py-2.5 lg:px-2.5 lg:py-1.5">
+    <div className="flex shrink-0 flex-col overflow-hidden rounded-xl border border-panel-border bg-app-surface lg:min-h-[22rem] lg:flex-1 lg:rounded-md">
+      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-app-border px-3 py-2.5 lg:px-2.5 lg:py-1.5">
         <h2 className="mr-auto text-[14px] font-bold text-panel-title lg:text-[12px] lg:font-semibold">
           All problems <span className="font-normal text-app-text-weak tabular-nums">· {rows.length}</span>
         </h2>
@@ -366,9 +366,9 @@ function ProblemTable({
           No problems match these filters.
         </p>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
           <table className="w-full text-left text-[13px] lg:text-[12px]">
-            <thead className="bg-app-muted text-[11px] font-bold tracking-[0.06em] text-app-text-weak uppercase lg:text-[10px]">
+            <thead className="sticky top-0 z-10 bg-app-muted text-[11px] font-bold tracking-[0.06em] text-app-text-weak uppercase lg:text-[10px]">
               <tr>
                 <th className="w-11 px-3 py-2 lg:w-9 lg:px-2.5 lg:py-1.5">
                   <span className="sr-only">Done</span>
