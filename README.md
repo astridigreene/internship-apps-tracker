@@ -39,7 +39,7 @@ Your application rows stay in **your** Google Sheet. The site does not store you
 | --- | --- |
 | Company | Last Updated — stamped when status changes |
 | Location | Highest Stage — auto-stamped, furthest stage reached (survives a later rejection) |
-| Role | |
+| Role | Pay ($/hr) — offer pay; added the first time you set one from an Offer's detail popup |
 | Date Applied | |
 | Status | |
 
@@ -58,6 +58,7 @@ make them by hand:
 | `2027 HireVue` | same as OA |
 | `2027 Interviews` | Company, Date & Time, End Time, Notes, Complete, App Row |
 | `2027 Screening` | Company, Date & Time, End Time, Notes, App Row |
+| `2027 Return Offer` | Company, Location, Role, Pay ($/hr) — one row; logged from the dashboard's **Return offer** button and counted in the Offer KPI and pipeline (not in the offer rate, since it isn't from an application) |
 
 A company can have several OA/HireVue/Interview rows at once. **App Row** is the
 row number of the application on the year tab, so an entry stays tied to one role

@@ -152,8 +152,44 @@ export interface Application {
    * null when the sheet has no OA Complete column.
    */
   oaComplete: OaComplete | null
+  /** Offer pay in $/hr as written in the Pay column; '' when blank or the column is absent. */
+  pay: string
   /** 1-based row number in the Google Sheet tab (includes header offset). */
   sheetRow: number
+}
+
+/**
+ * Parse a pay cell ("45", "$45.50", "45/hr") into dollars per hour.
+ * Returns null when it isn't a number.
+ */
+export function parsePay(raw: string): number | null {
+  const cleaned = raw
+    .trim()
+    .replace(/[$,\s]/g, '')
+    .replace(/\/(?:hr|hour|h)$/i, '')
+  if (!cleaned) {
+    return null
+  }
+  const n = Number(cleaned)
+  return Number.isFinite(n) && n >= 0 ? n : null
+}
+
+/** "$45/hr" for display; the raw text when it isn't a number; '' when blank. */
+export function formatPay(raw: string): string {
+  const n = parsePay(raw)
+  if (n === null) {
+    return raw.trim()
+  }
+  return `$${Number.isInteger(n) ? n : n.toFixed(2)}/hr`
+}
+
+/** The one return offer logged for a year (`<year> Return Offer` tab). Counts as an offer in stats. */
+export interface ReturnOffer {
+  company: string
+  location: string
+  role: string
+  /** $/hr, same format as Application.pay. */
+  pay: string
 }
 
 /** Effective highest stage for an application, falling back when the column is absent. */
@@ -182,6 +218,7 @@ export interface SheetColumns {
   lastUpdated: number | null
   oaComplete: number | null
   highestStage: number | null
+  pay: number | null
 }
 
 export interface Stats {
@@ -191,11 +228,12 @@ export interface Stats {
   progressed: number
   /** Cumulative: reached Interview or later. */
   interviews: number
-  /** Reached Offer. */
+  /** Reached Offer, plus the return offer when one is logged. */
   offers: number
   rejectionRate: number
   progressedRate: number
   interviewRate: number
+  /** Application offers ÷ applications (the return offer isn't from an application, so it's left out). */
   offerRate: number
   /** Currently active: status is Progressed or Interview. */
   inProgress: number
@@ -330,6 +368,8 @@ export interface TrackerData {
   hireVueTab: LinkedTabState<AssessmentSheetColumns>
   interviewsTab: LinkedTabState<InterviewSheetColumns>
   screeningTab: LinkedTabState<ScreeningSheetColumns>
+  /** This year's return offer, or null when none is logged. */
+  returnOffer: ReturnOffer | null
 }
 
 /**
@@ -397,8 +437,10 @@ export interface NeetCodeData {
   progress: NeetCodeProgress
 }
 
-/** Bundled CRUD handlers for the OA/HireVue/Interviews/Screening linked tabs. */
+/** Bundled write handlers for the application detail popup (linked tabs + offer pay). */
 export interface LinkedActions {
+  /** Write an application's Pay ($/hr) cell; '' clears it. */
+  updatePay: (app: Application, pay: string) => Promise<void>
   addOa: (input: NewAssessmentInput) => Promise<void>
   addHireVue: (input: NewAssessmentInput) => Promise<void>
   addInterview: (input: NewInterviewInput) => Promise<void>

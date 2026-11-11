@@ -20,6 +20,7 @@ import {
   type NewInterviewInput,
   type NewScreeningInput,
   type OaComplete,
+  type ReturnOffer,
   type ScreeningEntry,
   type ScreeningSheetColumns,
   type SheetColumns,
@@ -46,6 +47,10 @@ export const OPTIONAL_COLUMN_GUIDE = [
   {
     label: 'Highest Stage',
     hint: 'Auto-stamped: furthest stage reached, kept even after a rejection',
+  },
+  {
+    label: 'Pay ($/hr)',
+    hint: 'Offer pay in $/hr — added when you first set one',
   },
 ] as const
 
@@ -134,7 +139,10 @@ const HEADER_ALIASES: Record<string, string[]> = {
   ],
   oaComplete: ['oa complete', 'oacomplete', 'oa completed', 'oa done', 'completed oa'],
   highestStage: ['highest stage', 'highest', 'furthest stage', 'best stage', 'stage reached'],
+  pay: ['pay ($/hr)', 'pay', 'pay/hr', 'pay per hour', '$/hr', 'hourly pay', 'hourly rate', 'hourly'],
 }
+
+const PAY_HEADER_LABEL = 'Pay ($/hr)'
 
 const LINKED_HEADER_ALIASES = {
   company: ['company', 'employer', 'org', 'organization'],
@@ -325,6 +333,7 @@ export function parseSheetValues(values: string[][]): {
     lastUpdated: resolveColumnIndex(headerMap, HEADER_ALIASES.lastUpdated),
     oaComplete: resolveColumnIndex(headerMap, HEADER_ALIASES.oaComplete),
     highestStage: resolveColumnIndex(headerMap, HEADER_ALIASES.highestStage),
+    pay: resolveColumnIndex(headerMap, HEADER_ALIASES.pay),
   }
 
   const missingLabels: string[] = []
@@ -353,6 +362,7 @@ export function parseSheetValues(values: string[][]): {
     lastUpdated: resolved.lastUpdated ?? null,
     oaComplete: resolved.oaComplete ?? null,
     highestStage: resolved.highestStage ?? null,
+    pay: resolved.pay ?? null,
   }
 
   const cellAt = (row: string[], idx: number | undefined | null) =>
@@ -393,6 +403,7 @@ export function parseSheetValues(values: string[][]): {
       highestStage,
       lastUpdated,
       oaComplete,
+      pay: cellAt(row, columns.pay),
       sheetRow: i + 1,
     })
   }
@@ -400,7 +411,8 @@ export function parseSheetValues(values: string[][]): {
   return { applications: apps, columns }
 }
 
-export function computeStats(applications: Application[]): Stats {
+/** Stats for a year. A logged return offer adds one to the Offer count. */
+export function computeStats(applications: Application[], returnOffer?: ReturnOffer | null): Stats {
   const total = applications.length
   let rejections = 0
   let progressed = 0
@@ -434,7 +446,7 @@ export function computeStats(applications: Application[]): Stats {
     rejections,
     progressed,
     interviews,
-    offers,
+    offers: offers + (returnOffer ? 1 : 0),
     rejectionRate: rate(rejections),
     progressedRate: rate(progressed),
     interviewRate: rate(interviews),
@@ -622,21 +634,109 @@ export interface LinkedTrackerData {
   hireVueTab: LinkedTabState<AssessmentSheetColumns>
   interviewsTab: LinkedTabState<InterviewSheetColumns>
   screeningTab: LinkedTabState<ScreeningSheetColumns>
+  returnOffer: ReturnOffer | null
 }
 
-/** Fetch + parse all 4 optional linked tabs for a year. Tolerant of any/all missing. */
+/** The optional one-row tab holding a year's return offer. */
+export function returnOfferTabName(year: string): string {
+  return `${year} Return Offer`
+}
+
+const RETURN_OFFER_HEADER_ROW = ['Company', 'Location', 'Role', PAY_HEADER_LABEL]
+
+/** First non-empty data row of the Return Offer tab (headers matched by name). */
+function parseReturnOfferSheet(values: string[][]): ReturnOffer | null {
+  if (values.length < 2) {
+    return null
+  }
+  const headerMap = headerMapFor(values[0].map((h) => String(h ?? '').trim()))
+  const idx = {
+    company: resolveColumnIndex(headerMap, HEADER_ALIASES.company),
+    location: resolveColumnIndex(headerMap, HEADER_ALIASES.location),
+    role: resolveColumnIndex(headerMap, HEADER_ALIASES.role),
+    pay: resolveColumnIndex(headerMap, HEADER_ALIASES.pay),
+  }
+  const cellAt = (row: string[], i: number | undefined) =>
+    i !== undefined && i < row.length ? String(row[i] ?? '').trim() : ''
+  for (const row of values.slice(1)) {
+    const offer: ReturnOffer = {
+      company: cellAt(row, idx.company),
+      location: cellAt(row, idx.location),
+      role: cellAt(row, idx.role),
+      pay: cellAt(row, idx.pay),
+    }
+    if (offer.company || offer.role) {
+      return offer
+    }
+  }
+  return null
+}
+
+/** Write (create or replace) the year's single return offer. */
+export async function saveReturnOffer(options: {
+  spreadsheetId: string
+  accessToken: string
+  year: string
+  offer: ReturnOffer
+}): Promise<ReturnOffer> {
+  const offer: ReturnOffer = {
+    company: options.offer.company.trim(),
+    location: options.offer.location.trim(),
+    role: options.offer.role.trim(),
+    pay: options.offer.pay.trim(),
+  }
+  if (!offer.company || !offer.role) {
+    throw new Error('A return offer needs at least a Company and Role.')
+  }
+  const sheetTitle = returnOfferTabName(options.year)
+  await ensureSheetTab({ ...options, sheetTitle })
+  // The tab is app-owned with a fixed layout: rewrite the header + the one row.
+  await putSheetValues({
+    spreadsheetId: options.spreadsheetId,
+    accessToken: options.accessToken,
+    sheetTitle,
+    startCell: 'A1',
+    values: [RETURN_OFFER_HEADER_ROW, [offer.company, offer.location, offer.role, offer.pay]],
+  })
+  return offer
+}
+
+/** Remove the year's return offer (clears the data row; the tab stays). */
+export async function clearReturnOffer(options: {
+  spreadsheetId: string
+  accessToken: string
+  year: string
+}): Promise<void> {
+  const sheetTitle = returnOfferTabName(options.year)
+  const values = await fetchOptionalSheetValues(options.spreadsheetId, options.accessToken, sheetTitle)
+  if (!values || values.length < 2) {
+    return
+  }
+  const width = Math.max(RETURN_OFFER_HEADER_ROW.length, ...values.map((row) => row.length))
+  await putSheetValues({
+    spreadsheetId: options.spreadsheetId,
+    accessToken: options.accessToken,
+    sheetTitle,
+    startCell: 'A2',
+    values: values.slice(1).map(() => Array.from({ length: width }, () => '')),
+  })
+}
+
+/** Fetch + parse all optional linked tabs for a year. Tolerant of any/all missing. */
 export async function fetchLinkedTrackerData(
   spreadsheetId: string,
   accessToken: string,
   year: string,
 ): Promise<LinkedTrackerData> {
   const names = linkedTabNames(year)
-  const [oaValues, hireVueValues, interviewsValues, screeningValues] = await Promise.all([
-    fetchOptionalSheetValues(spreadsheetId, accessToken, names.oa),
-    fetchOptionalSheetValues(spreadsheetId, accessToken, names.hireVue),
-    fetchOptionalSheetValues(spreadsheetId, accessToken, names.interviews),
-    fetchOptionalSheetValues(spreadsheetId, accessToken, names.screening),
-  ])
+  const [oaValues, hireVueValues, interviewsValues, screeningValues, returnOfferValues] =
+    await Promise.all([
+      fetchOptionalSheetValues(spreadsheetId, accessToken, names.oa),
+      fetchOptionalSheetValues(spreadsheetId, accessToken, names.hireVue),
+      fetchOptionalSheetValues(spreadsheetId, accessToken, names.interviews),
+      fetchOptionalSheetValues(spreadsheetId, accessToken, names.screening),
+      fetchOptionalSheetValues(spreadsheetId, accessToken, returnOfferTabName(year)),
+    ])
 
   const oaParsed = parseAssessmentSheet(oaValues ?? [], 'OA')
   const hireVueParsed = parseAssessmentSheet(hireVueValues ?? [], 'HireVue')
@@ -652,6 +752,7 @@ export async function fetchLinkedTrackerData(
     hireVueTab: { present: hireVueValues !== null, columns: hireVueParsed.columns },
     interviewsTab: { present: interviewsValues !== null, columns: interviewsParsed.columns },
     screeningTab: { present: screeningValues !== null, columns: screeningParsed.columns },
+    returnOffer: parseReturnOfferSheet(returnOfferValues ?? []),
   }
 }
 
@@ -659,7 +760,7 @@ export function buildTrackerData(values: string[][], linked: LinkedTrackerData):
   const { applications, columns } = parseSheetValues(values)
   return {
     lastSynced: new Date().toISOString(),
-    stats: computeStats(applications),
+    stats: computeStats(applications, linked.returnOffer),
     applications,
     columns,
     ...linked,
@@ -815,6 +916,38 @@ export async function ensureHighestStageColumn(options: {
     aliases: HEADER_ALIASES.highestStage,
     headerLabel: 'Highest Stage',
   })
+}
+
+/** Write an application's Pay ($/hr), adding the column on first use. Returns updated columns. */
+export async function updateSheetPay(options: {
+  spreadsheetId: string
+  accessToken: string
+  sheetTitle: string
+  sheetRow: number
+  columns: SheetColumns
+  pay: string
+}): Promise<SheetColumns> {
+  let payCol = options.columns.pay
+  if (payCol === null) {
+    const values = await fetchSheetValues(options.spreadsheetId, options.accessToken, options.sheetTitle, 'A1:Z1')
+    payCol = await ensureHeaderColumn({
+      spreadsheetId: options.spreadsheetId,
+      accessToken: options.accessToken,
+      sheetTitle: options.sheetTitle,
+      headerRow: values[0] ?? [],
+      aliases: HEADER_ALIASES.pay,
+      headerLabel: PAY_HEADER_LABEL,
+    })
+  }
+  const columns = { ...options.columns, pay: payCol }
+  await putSheetValues({
+    spreadsheetId: options.spreadsheetId,
+    accessToken: options.accessToken,
+    sheetTitle: options.sheetTitle,
+    startCell: `${columnLetter(payCol)}${options.sheetRow}`,
+    values: [[options.pay.trim()]],
+  })
+  return columns
 }
 
 /** Update Status (+ Last Updated + Highest Stage) for an application row. */
