@@ -4,8 +4,11 @@ import type {
   ApplicationStatus,
   LinkedActions,
   NewApplicationInput,
+  ReturnOffer,
   TrackerData,
 } from '../types'
+import { formatPay } from '../types'
+import { ReturnOfferModal } from '../components/ReturnOfferModal'
 import { KpiCard } from '../components/KpiCard'
 import { StatusFunnel } from '../components/StatusFunnel'
 import { RecentUpdates } from '../components/RecentUpdates'
@@ -14,6 +17,7 @@ import { DueSoonBanner } from '../components/DueSoonBanner'
 import { AppsPerDayChart } from '../components/AppsPerDayChart'
 import { ApplicationDetailModal } from '../components/ApplicationDetailModal'
 import { NewApplicationModal } from '../components/NewApplicationModal'
+import { useNeetCode } from '../lib/useNeetCode'
 import { applicationForEntry, computeStats, linkedEntriesForApplication } from '../lib/sheet'
 import type { ApplicationsStatusFilter, StatusEditChange } from './ApplicationsView'
 
@@ -25,7 +29,12 @@ interface DashboardViewProps {
   onOpenInProgress: () => void
   onSaveStatusChanges?: (changes: StatusEditChange[]) => Promise<void>
   onAddApplication?: (application: NewApplicationInput) => Promise<void>
+  onSaveReturnOffer?: (offer: ReturnOffer | null) => Promise<void>
   linkedActions?: LinkedActions
+  /** For the To-Do card's NeetCode rows. */
+  accessToken: string
+  userEmail: string
+  neetcodeSheetId: string
 }
 
 function formatRate(rate: number): string {
@@ -53,11 +62,20 @@ export function DashboardView({
   onOpenInProgress,
   onSaveStatusChanges,
   onAddApplication,
+  onSaveReturnOffer,
   linkedActions,
+  accessToken,
+  userEmail,
+  neetcodeSheetId,
 }: DashboardViewProps) {
-  const stats = useMemo(() => computeStats(data.applications), [data.applications])
+  const neetcode = useNeetCode(accessToken, userEmail, neetcodeSheetId)
+  const stats = useMemo(
+    () => computeStats(data.applications, data.returnOffer),
+    [data.applications, data.returnOffer],
+  )
   const [detailApp, setDetailApp] = useState<Application | null>(null)
   const [newOpen, setNewOpen] = useState(false)
+  const [returnOfferOpen, setReturnOfferOpen] = useState(false)
 
   const detailAppLive =
     detailApp === null
@@ -120,6 +138,18 @@ export function DashboardView({
         }}
       />
 
+      <ReturnOfferModal
+        open={returnOfferOpen}
+        offer={data.returnOffer}
+        saving={saving}
+        onClose={() => {
+          if (!saving) {
+            setReturnOfferOpen(false)
+          }
+        }}
+        onSave={onSaveReturnOffer}
+      />
+
       <DueSoonBanner
         oaEntries={data.oaEntries}
         hireVueEntries={data.hireVueEntries}
@@ -138,6 +168,32 @@ export function DashboardView({
           <span className="text-[16px] font-bold tabular-nums text-app-brand-dark lg:text-[14px] dark:text-app-brand">
             {stats.inProgress}
           </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setReturnOfferOpen(true)}
+          disabled={!onSaveReturnOffer && !data.returnOffer}
+          title={
+            data.returnOffer
+              ? `Return offer: ${data.returnOffer.company}${data.returnOffer.pay ? ` · ${formatPay(data.returnOffer.pay)}` : ''}`
+              : 'Log a return offer'
+          }
+          className="inline-flex h-11 max-w-[42%] shrink-0 items-center gap-1.5 rounded-lg border border-kpi-offer-border bg-kpi-offer-bg px-3 text-[13px] font-bold text-kpi-offer-text hover:brightness-[0.97] disabled:cursor-not-allowed disabled:opacity-40 lg:h-9 lg:max-w-xs lg:rounded lg:px-2.5 lg:text-[12px]"
+        >
+          {data.returnOffer ? (
+            <>
+              <span className="shrink-0">Return</span>
+              <span className="truncate font-semibold opacity-80">
+                {data.returnOffer.company}
+                {data.returnOffer.pay ? ` · ${formatPay(data.returnOffer.pay)}` : ''}
+              </span>
+            </>
+          ) : (
+            <>
+              <PlusIcon />
+              <span className="truncate">Return offer</span>
+            </>
+          )}
         </button>
         <button
           type="button"
@@ -208,11 +264,14 @@ export function DashboardView({
             applications={data.applications}
             onOpenAll={onOpenInProgress}
             onSelectApplication={setDetailApp}
+            linkedActions={linkedActions}
+            neetcode={neetcode}
           />
         </div>
         <div className="lg:col-span-5 lg:min-h-0">
           <StatusFunnel
             applications={data.applications}
+            returnOffer={data.returnOffer}
             fill
             onSelectStage={onOpenApplications}
           />

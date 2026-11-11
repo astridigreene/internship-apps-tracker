@@ -9,12 +9,14 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import type { Application } from '../types'
+import type { Application, ReturnOffer } from '../types'
 import { computeStats } from '../lib/sheet'
 import type { ApplicationsStatusFilter } from '../views/ApplicationsView'
 
 interface StatusFunnelProps {
   applications: Application[]
+  /** Counted in the Offer bar when logged. */
+  returnOffer?: ReturnOffer | null
   fill?: boolean
   onSelectStage?: (filter: ApplicationsStatusFilter) => void
 }
@@ -74,11 +76,11 @@ function cssVar(name: string, fallback: string) {
   return value || fallback
 }
 
-export function StatusFunnel({ applications, fill, onSelectStage }: StatusFunnelProps) {
+export function StatusFunnel({ applications, returnOffer, fill, onSelectStage }: StatusFunnelProps) {
   const dark = usePrefersDark()
   const stageColors = dark ? STAGE_COLORS_DARK : STAGE_COLORS_LIGHT
 
-  const stats = computeStats(applications)
+  const stats = computeStats(applications, returnOffer)
   const current: Record<Stage, number> = {
     Progressed: stats.progressed,
     Interview: stats.interviews,

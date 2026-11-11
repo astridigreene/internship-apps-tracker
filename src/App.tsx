@@ -11,6 +11,7 @@ import {
   type NewAssessmentInput,
   type NewInterviewInput,
   type NewScreeningInput,
+  type ReturnOffer,
   type ScreeningEntry,
   SavedWithWarningError,
   type TrackerData,
@@ -29,6 +30,7 @@ import {
   appendScreeningEntry,
   appendSheetApplication,
   buildTrackerData,
+  clearReturnOffer,
   computeStats,
   deleteLinkedRow,
   deleteSheetRow,
@@ -40,6 +42,7 @@ import {
   listYearSheets,
   nextSummerYear,
   pickDefaultYear,
+  saveReturnOffer,
   SheetSetupError,
   shiftAppRowAfterDelete,
   shiftLinkedAppRows,
@@ -49,6 +52,7 @@ import {
   updateLinkedAppRow,
   updateLinkedComplete,
   type LinkedKind,
+  updateSheetPay,
   updateSheetStatus,
 } from './lib/sheet'
 import { formatDisplayDateTime, hasMeetingEnded, parseSheetDate, statusUpdateStamp } from './lib/time'
@@ -607,7 +611,7 @@ export default function App() {
     setData({
       ...data,
       applications: nextApps,
-      stats: computeStats(nextApps),
+      stats: computeStats(nextApps, data.returnOffer),
       lastSynced: new Date().toISOString(),
     })
 
@@ -668,6 +672,7 @@ export default function App() {
         lastUpdated: stamp,
         highestStage: deriveHighestStageOnStatusChange(null, 'Applied', application.status),
         oaComplete: null,
+        pay: '',
         sheetRow,
       }
       const nextApps = [...data.applications, nextApp]
@@ -675,7 +680,7 @@ export default function App() {
         ...data,
         columns,
         applications: nextApps,
-        stats: computeStats(nextApps),
+        stats: computeStats(nextApps, data.returnOffer),
         lastSynced: new Date().toISOString(),
       })
       if (!isRejectedStatus(application.status)) {
@@ -712,7 +717,7 @@ export default function App() {
     setData({
       ...data,
       applications: nextApps,
-      stats: computeStats(nextApps),
+      stats: computeStats(nextApps, data.returnOffer),
       oaEntries: shiftAppRowAfterDelete(data.oaEntries, app.sheetRow),
       hireVueEntries: shiftAppRowAfterDelete(data.hireVueEntries, app.sheetRow),
       interviewEntries: shiftAppRowAfterDelete(data.interviewEntries, app.sheetRow),
@@ -753,6 +758,75 @@ export default function App() {
       )
     } finally {
       setDeleting(false)
+    }
+  }
+
+  async function handleUpdatePay(app: Application, pay: string) {
+    if (!accessToken || !data || !sheetId) {
+      return
+    }
+    setError(null)
+    setSaving(true)
+    try {
+      const token = await ensureFreshToken()
+      const columns = await updateSheetPay({
+        spreadsheetId: sheetId,
+        accessToken: token,
+        sheetTitle: selectedYear,
+        sheetRow: app.sheetRow,
+        columns: data.columns,
+        pay,
+      })
+      setData((current) =>
+        current
+          ? {
+              ...current,
+              columns,
+              applications: current.applications.map((row) =>
+                row.sheetRow === app.sheetRow ? { ...row, pay: pay.trim() } : row,
+              ),
+            }
+          : current,
+      )
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not save pay'
+      setError(message)
+      throw err instanceof Error ? err : new Error(message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  /** Save (offer) or remove (null) this year's return offer. */
+  async function handleSaveReturnOffer(offer: ReturnOffer | null) {
+    if (!accessToken || !data || !sheetId) {
+      return
+    }
+    setError(null)
+    setSaving(true)
+    try {
+      const token = await ensureFreshToken()
+      const target = { spreadsheetId: sheetId, accessToken: token, year: selectedYear }
+      let saved: ReturnOffer | null = null
+      if (offer) {
+        saved = await saveReturnOffer({ ...target, offer })
+      } else {
+        await clearReturnOffer(target)
+      }
+      setData((current) =>
+        current
+          ? { ...current, returnOffer: saved, stats: computeStats(current.applications, saved) }
+          : current,
+      )
+      if (saved && !data.returnOffer) {
+        celebrate()
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not save return offer'
+      setError(message)
+      throw err instanceof Error ? err : new Error(message)
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -1283,6 +1357,7 @@ export default function App() {
   }
 
   const linkedActions: LinkedActions = {
+    updatePay: handleUpdatePay,
     addOa: (input) => handleAddAssessment('OA', input),
     addHireVue: (input) => handleAddAssessment('HireVue', input),
     addInterview: handleAddInterview,
@@ -1421,7 +1496,11 @@ export default function App() {
               }}
               onSaveStatusChanges={handleSaveStatusChanges}
               onAddApplication={handleAddApplication}
+              onSaveReturnOffer={handleSaveReturnOffer}
               linkedActions={linkedActions}
+              accessToken={accessToken}
+              userEmail={user.email}
+              neetcodeSheetId={config.neetcodeSheetId}
             />
           </div>
         ) : view === 'applications' ? (
@@ -1437,6 +1516,8 @@ export default function App() {
               onSaveStatusChanges={handleSaveStatusChanges}
               onAddApplication={handleAddApplication}
               onDeleteApplication={handleDeleteApplication}
+              returnOffer={data.returnOffer}
+              onSaveReturnOffer={handleSaveReturnOffer}
               linkedData={data}
               linkedActions={linkedActions}
             />

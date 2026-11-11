@@ -1,7 +1,9 @@
 import { useEffect, useId, useState } from 'react'
 import {
   effectiveHighestStage,
+  formatPay,
   isRejectedStatus,
+  parsePay,
   nextPipelineStatus,
   type Application,
   type ApplicationStatus,
@@ -42,6 +44,8 @@ export function ApplicationDetailModal({
   const [editing, setEditing] = useState(false)
   const [draftStatus, setDraftStatus] = useState<ApplicationStatus | string>('')
   const [error, setError] = useState<string | null>(null)
+  const [editingPay, setEditingPay] = useState(false)
+  const [draftPay, setDraftPay] = useState('')
 
   useEffect(() => {
     if (!app) {
@@ -50,6 +54,7 @@ export function ApplicationDetailModal({
     setEditing(false)
     setDraftStatus(app.status)
     setError(null)
+    setEditingPay(false)
   }, [app])
 
   useEffect(() => {
@@ -87,6 +92,30 @@ export function ApplicationDetailModal({
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not update status')
+    }
+  }
+
+  function startPayEdit() {
+    const n = parsePay(current.pay)
+    setDraftPay(n === null ? current.pay : String(n))
+    setEditingPay(true)
+    setError(null)
+  }
+
+  async function savePay() {
+    if (!linkedActions || saving) {
+      return
+    }
+    if (draftPay.trim() && parsePay(draftPay) === null) {
+      setError('Pay should be a number of dollars per hour.')
+      return
+    }
+    setError(null)
+    try {
+      await linkedActions.updatePay(current, draftPay.trim())
+      setEditingPay(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save pay')
     }
   }
 
@@ -162,6 +191,64 @@ export function ApplicationDetailModal({
             <p className={fieldLabel}>Highest Stage</p>
             <p className={fieldValue}>{highest}</p>
           </div>
+          {highest === 'Offer' ? (
+            <div>
+              <p className={fieldLabel}>Pay ($/hr)</p>
+              {editingPay ? (
+                <form
+                  className="mt-1.5 flex items-center gap-2"
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    void savePay()
+                  }}
+                >
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    step="0.01"
+                    placeholder="e.g. 45"
+                    autoFocus
+                    value={draftPay}
+                    disabled={saving}
+                    onChange={(e) => setDraftPay(e.target.value)}
+                    className="h-9 w-28 rounded border border-app-border bg-app-surface px-2.5 text-[13px] font-semibold text-app-text tabular-nums outline-none focus:border-app-brand"
+                  />
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={() => setEditingPay(false)}
+                    className="h-9 rounded border border-app-border px-3 text-[12px] font-bold text-app-text hover:bg-app-hover disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="h-9 rounded bg-app-brand px-3 text-[12px] font-bold text-white hover:bg-app-brand-dark disabled:cursor-not-allowed disabled:opacity-45 dark:text-teal-950"
+                  >
+                    {saving ? 'Saving…' : 'Save'}
+                  </button>
+                </form>
+              ) : (
+                <div className="mt-1 flex items-center gap-2">
+                  <p className="text-[14px] font-semibold text-app-text tabular-nums">
+                    {formatPay(current.pay) || '—'}
+                  </p>
+                  {linkedActions ? (
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={startPayEdit}
+                      className="text-[12px] font-bold text-app-brand hover:underline disabled:opacity-50"
+                    >
+                      {current.pay ? 'Edit' : 'Add pay'}
+                    </button>
+                  ) : null}
+                </div>
+              )}
+            </div>
+          ) : null}
           <div>
             <p className={fieldLabel}>Status</p>
             <div className="mt-1.5">

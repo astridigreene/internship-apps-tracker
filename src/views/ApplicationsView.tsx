@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import {
+  formatPay,
   isRejectedStatus,
+  type ReturnOffer,
   type Application,
   type ApplicationStatus,
   type AssessmentEntry,
@@ -15,6 +17,7 @@ import { NewApplicationModal } from '../components/NewApplicationModal'
 import { DeleteConfirmModal } from '../components/DeleteConfirmModal'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { ApplicationDetailModal } from '../components/ApplicationDetailModal'
+import { ReturnOfferModal } from '../components/ReturnOfferModal'
 import { formatDisplayDate } from '../lib/time'
 import { linkedEntriesForApplication } from '../lib/sheet'
 
@@ -65,6 +68,9 @@ interface ApplicationsViewProps {
   onSaveStatusChanges?: (changes: StatusEditChange[]) => Promise<void>
   onAddApplication?: (application: NewApplicationInput) => Promise<void>
   onDeleteApplication?: (app: Application) => Promise<void>
+  /** Shown at the top of the Offer filter. */
+  returnOffer?: ReturnOffer | null
+  onSaveReturnOffer?: (offer: ReturnOffer | null) => Promise<void>
   linkedData?: {
     oaEntries: AssessmentEntry[]
     hireVueEntries: AssessmentEntry[]
@@ -192,9 +198,12 @@ export function ApplicationsView({
   onSaveStatusChanges,
   onAddApplication,
   onDeleteApplication,
+  returnOffer = null,
+  onSaveReturnOffer,
   linkedData,
   linkedActions,
 }: ApplicationsViewProps) {
+  const [returnOfferOpen, setReturnOfferOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('dateApplied')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
@@ -495,6 +504,44 @@ export function ApplicationsView({
         linkedActions={linkedActions}
       />
 
+      <ReturnOfferModal
+        open={returnOfferOpen}
+        offer={returnOffer}
+        saving={saving}
+        onClose={() => {
+          if (!saving) {
+            setReturnOfferOpen(false)
+          }
+        }}
+        onSave={onSaveReturnOffer}
+      />
+
+      {statusFilter === 'Offer' && (returnOffer || onSaveReturnOffer) ? (
+        <button
+          type="button"
+          onClick={() => setReturnOfferOpen(true)}
+          className="flex w-full shrink-0 items-center gap-3 rounded-xl border border-kpi-offer-border bg-kpi-offer-bg px-4 py-3 text-left text-kpi-offer-text hover:brightness-[0.97] lg:rounded-md lg:px-3 lg:py-2"
+        >
+          <span className="shrink-0 rounded-full bg-app-surface/70 px-2 py-0.5 text-[11px] font-bold tracking-[0.04em] uppercase">
+            Return offer
+          </span>
+          {returnOffer ? (
+            <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">
+              <span className="font-bold">{returnOffer.company}</span>
+              {[returnOffer.role, returnOffer.location, formatPay(returnOffer.pay)]
+                .filter(Boolean)
+                .map((part) => ` · ${part}`)
+                .join('')}
+            </span>
+          ) : (
+            <span className="min-w-0 flex-1 truncate text-[13px] font-semibold opacity-80">
+              None logged — tap to add one
+            </span>
+          )}
+          <span className="shrink-0 text-[12px] font-bold">{returnOffer ? 'Edit' : 'Add'}</span>
+        </button>
+      ) : null}
+
       <div className="w-full overflow-hidden rounded-xl border border-panel-border bg-app-surface lg:min-h-0 lg:flex-1 lg:overflow-auto lg:rounded-md">
         {/* Mobile card list */}
         <ul className="divide-y divide-app-border md:hidden">
@@ -542,7 +589,7 @@ export function ApplicationsView({
                       </div>
                       <p className="mt-1 text-[13px] font-semibold text-app-text">{app.role}</p>
                       <p className="mt-1 text-[12px] font-semibold text-app-text-weak">
-                        {[app.location, formatDisplayDate(app.dateApplied) || app.dateApplied]
+                        {[app.location, formatDisplayDate(app.dateApplied) || app.dateApplied, formatPay(app.pay)]
                           .filter(Boolean)
                           .join(' · ')}
                       </p>
@@ -644,7 +691,14 @@ export function ApplicationsView({
                           onChange={(next) => handleDraftStatusChange(app, next)}
                         />
                       ) : (
-                        <StatusPill status={status} />
+                        <span className="flex min-w-0 items-center gap-1.5">
+                          <StatusPill status={status} />
+                          {app.pay ? (
+                            <span className="truncate text-[12px] font-semibold text-app-text-weak tabular-nums">
+                              {formatPay(app.pay)}
+                            </span>
+                          ) : null}
+                        </span>
                       )}
                     </td>
                     <td className="px-1 py-0 text-right">
