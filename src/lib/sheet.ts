@@ -52,6 +52,10 @@ export const OPTIONAL_COLUMN_GUIDE = [
     label: 'Pay ($/hr)',
     hint: 'Offer pay in $/hr — added when you first set one',
   },
+  {
+    label: 'Offer Date',
+    hint: 'Stamped when an application is marked Offer',
+  },
 ] as const
 
 /** Optional sibling tabs per year (e.g. "2027 OA") — created automatically on first use. */
@@ -140,9 +144,11 @@ const HEADER_ALIASES: Record<string, string[]> = {
   oaComplete: ['oa complete', 'oacomplete', 'oa completed', 'oa done', 'completed oa'],
   highestStage: ['highest stage', 'highest', 'furthest stage', 'best stage', 'stage reached'],
   pay: ['pay ($/hr)', 'pay', 'pay/hr', 'pay per hour', '$/hr', 'hourly pay', 'hourly rate', 'hourly'],
+  offerDate: ['offer date', 'date offered', 'offered on', 'offer received', 'date of offer'],
 }
 
 const PAY_HEADER_LABEL = 'Pay ($/hr)'
+const OFFER_DATE_HEADER_LABEL = 'Offer Date'
 
 const LINKED_HEADER_ALIASES = {
   company: ['company', 'employer', 'org', 'organization'],
@@ -334,6 +340,7 @@ export function parseSheetValues(values: string[][]): {
     oaComplete: resolveColumnIndex(headerMap, HEADER_ALIASES.oaComplete),
     highestStage: resolveColumnIndex(headerMap, HEADER_ALIASES.highestStage),
     pay: resolveColumnIndex(headerMap, HEADER_ALIASES.pay),
+    offerDate: resolveColumnIndex(headerMap, HEADER_ALIASES.offerDate),
   }
 
   const missingLabels: string[] = []
@@ -363,6 +370,7 @@ export function parseSheetValues(values: string[][]): {
     oaComplete: resolved.oaComplete ?? null,
     highestStage: resolved.highestStage ?? null,
     pay: resolved.pay ?? null,
+    offerDate: resolved.offerDate ?? null,
   }
 
   const cellAt = (row: string[], idx: number | undefined | null) =>
@@ -404,6 +412,7 @@ export function parseSheetValues(values: string[][]): {
       lastUpdated,
       oaComplete,
       pay: cellAt(row, columns.pay),
+      offerDate: formatDisplayDate(cellAt(row, columns.offerDate)) || cellAt(row, columns.offerDate),
       sheetRow: i + 1,
     })
   }
@@ -544,6 +553,7 @@ function parseInterviewSheet(values: string[][]): {
     company,
     dateTime,
     endTime: resolveColumnIndex(headerMap, LINKED_HEADER_ALIASES.endTime) ?? null,
+    dateOffered: resolveColumnIndex(headerMap, LINKED_HEADER_ALIASES.dateOffered) ?? null,
     notes: resolveColumnIndex(headerMap, LINKED_HEADER_ALIASES.notes) ?? null,
     complete: resolveColumnIndex(headerMap, LINKED_HEADER_ALIASES.complete) ?? null,
     appRow: resolveColumnIndex(headerMap, LINKED_HEADER_ALIASES.appRow) ?? null,
@@ -564,6 +574,7 @@ function parseInterviewSheet(values: string[][]): {
       company: companyVal,
       dateTime: dateTimeVal,
       endTime: cellAt(row, columns.endTime),
+      dateOffered: formatDisplayDate(cellAt(row, columns.dateOffered)) || cellAt(row, columns.dateOffered),
       notes: cellAt(row, columns.notes),
       complete: normalizeYesNo(cellAt(row, columns.complete)),
       appRow: parseAppRow(cellAt(row, columns.appRow)),
@@ -597,6 +608,7 @@ function parseScreeningSheet(values: string[][]): {
     company,
     dateTime,
     endTime: resolveColumnIndex(headerMap, LINKED_HEADER_ALIASES.endTime) ?? null,
+    dateOffered: resolveColumnIndex(headerMap, LINKED_HEADER_ALIASES.dateOffered) ?? null,
     notes: resolveColumnIndex(headerMap, LINKED_HEADER_ALIASES.notes) ?? null,
     appRow: resolveColumnIndex(headerMap, LINKED_HEADER_ALIASES.appRow) ?? null,
   }
@@ -616,6 +628,7 @@ function parseScreeningSheet(values: string[][]): {
       company: companyVal,
       dateTime: dateTimeVal,
       endTime: cellAt(row, columns.endTime),
+      dateOffered: formatDisplayDate(cellAt(row, columns.dateOffered)) || cellAt(row, columns.dateOffered),
       notes: cellAt(row, columns.notes),
       appRow: parseAppRow(cellAt(row, columns.appRow)),
       sheetRow: i + 1,
@@ -642,7 +655,7 @@ export function returnOfferTabName(year: string): string {
   return `${year} Return Offer`
 }
 
-const RETURN_OFFER_HEADER_ROW = ['Company', 'Location', 'Role', PAY_HEADER_LABEL]
+const RETURN_OFFER_HEADER_ROW = ['Company', 'Location', 'Role', PAY_HEADER_LABEL, OFFER_DATE_HEADER_LABEL]
 
 /** First non-empty data row of the Return Offer tab (headers matched by name). */
 function parseReturnOfferSheet(values: string[][]): ReturnOffer | null {
@@ -655,6 +668,7 @@ function parseReturnOfferSheet(values: string[][]): ReturnOffer | null {
     location: resolveColumnIndex(headerMap, HEADER_ALIASES.location),
     role: resolveColumnIndex(headerMap, HEADER_ALIASES.role),
     pay: resolveColumnIndex(headerMap, HEADER_ALIASES.pay),
+    dateOffered: resolveColumnIndex(headerMap, HEADER_ALIASES.offerDate),
   }
   const cellAt = (row: string[], i: number | undefined) =>
     i !== undefined && i < row.length ? String(row[i] ?? '').trim() : ''
@@ -664,6 +678,7 @@ function parseReturnOfferSheet(values: string[][]): ReturnOffer | null {
       location: cellAt(row, idx.location),
       role: cellAt(row, idx.role),
       pay: cellAt(row, idx.pay),
+      dateOffered: formatDisplayDate(cellAt(row, idx.dateOffered)) || cellAt(row, idx.dateOffered),
     }
     if (offer.company || offer.role) {
       return offer
@@ -684,6 +699,7 @@ export async function saveReturnOffer(options: {
     location: options.offer.location.trim(),
     role: options.offer.role.trim(),
     pay: options.offer.pay.trim(),
+    dateOffered: formatDisplayDate(options.offer.dateOffered) || options.offer.dateOffered.trim(),
   }
   if (!offer.company || !offer.role) {
     throw new Error('A return offer needs at least a Company and Role.')
@@ -696,7 +712,7 @@ export async function saveReturnOffer(options: {
     accessToken: options.accessToken,
     sheetTitle,
     startCell: 'A1',
-    values: [RETURN_OFFER_HEADER_ROW, [offer.company, offer.location, offer.role, offer.pay]],
+    values: [RETURN_OFFER_HEADER_ROW, [offer.company, offer.location, offer.role, offer.pay, offer.dateOffered]],
   })
   return offer
 }
@@ -950,6 +966,32 @@ export async function updateSheetPay(options: {
   return columns
 }
 
+/** Write an application's Offer Date, adding the column on first use. Returns updated columns. */
+export async function updateSheetOfferDate(options: {
+  spreadsheetId: string
+  accessToken: string
+  sheetTitle: string
+  sheetRow: number
+  columns: SheetColumns
+  /** YYYY-MM-DD (from a date input) or ''. */
+  date: string
+}): Promise<{ columns: SheetColumns; offerDate: string }> {
+  let col = options.columns.offerDate
+  if (col === null) {
+    const values = await fetchSheetValues(options.spreadsheetId, options.accessToken, options.sheetTitle, 'A1:Z1')
+    col = await ensureOfferDateColumn({ ...options, headerRow: values[0] ?? [] })
+  }
+  const offerDate = formatDisplayDate(options.date) || options.date.trim()
+  await putSheetValues({
+    spreadsheetId: options.spreadsheetId,
+    accessToken: options.accessToken,
+    sheetTitle: options.sheetTitle,
+    startCell: `${columnLetter(col)}${options.sheetRow}`,
+    values: [[offerDate]],
+  })
+  return { columns: { ...options.columns, offerDate: col }, offerDate }
+}
+
 /** Update Status (+ Last Updated + Highest Stage) for an application row. */
 export async function updateSheetStatus(options: {
   spreadsheetId: string
@@ -960,6 +1002,8 @@ export async function updateSheetStatus(options: {
   status: string
   currentStatus: string
   currentHighestStage: HighestStage | null
+  /** The row's current Offer Date; stamped with today on a move to Offer only when this is blank. */
+  currentOfferDate: string
   lastUpdatedStamp: string
 }): Promise<SheetColumns> {
   await putSheetValues({
@@ -1026,7 +1070,47 @@ export async function updateSheetStatus(options: {
     values: [[nextHighest]],
   })
 
+  if (shouldStampOfferDate(options.status, options.currentOfferDate)) {
+    let offerDateCol = columns.offerDate
+    if (offerDateCol === null) {
+      offerDateCol = await ensureOfferDateColumn({
+        ...options,
+        // Fresh read: Last Updated / Highest Stage may have just been added.
+        headerRow: (await fetchSheetValues(options.spreadsheetId, options.accessToken, options.sheetTitle, 'A1:Z1'))[0] ?? [],
+      })
+      columns = { ...columns, offerDate: offerDateCol }
+    }
+    await putSheetValues({
+      spreadsheetId: options.spreadsheetId,
+      accessToken: options.accessToken,
+      sheetTitle: options.sheetTitle,
+      startCell: `${columnLetter(offerDateCol)}${options.sheetRow}`,
+      values: [[options.lastUpdatedStamp]],
+    })
+  }
+
   return columns
+}
+
+/** A move to Offer stamps the Offer Date, unless one is already recorded. */
+export function shouldStampOfferDate(toStatus: string, currentOfferDate: string): boolean {
+  return toStatus.trim().toLowerCase() === 'offer' && !currentOfferDate.trim()
+}
+
+function ensureOfferDateColumn(options: {
+  spreadsheetId: string
+  accessToken: string
+  sheetTitle: string
+  headerRow: string[]
+}): Promise<number> {
+  return ensureHeaderColumn({
+    spreadsheetId: options.spreadsheetId,
+    accessToken: options.accessToken,
+    sheetTitle: options.sheetTitle,
+    headerRow: options.headerRow,
+    aliases: HEADER_ALIASES.offerDate,
+    headerLabel: OFFER_DATE_HEADER_LABEL,
+  })
 }
 
 function assertCompleteApplication(input: NewApplicationInput): NewApplicationInput {
@@ -1086,6 +1170,16 @@ export async function appendSheetApplication(options: {
     columns = { ...columns, highestStage }
   }
 
+  const stampOffer = shouldStampOfferDate(app.status, '')
+  if (stampOffer && columns.offerDate === null) {
+    const offerDate = await ensureOfferDateColumn({
+        ...options,
+        // Fresh read: Last Updated / Highest Stage may have just been added.
+        headerRow: (await fetchSheetValues(options.spreadsheetId, options.accessToken, options.sheetTitle, 'A1:Z1'))[0] ?? [],
+      })
+    columns = { ...columns, offerDate }
+  }
+
   const initialHighest = deriveHighestStageOnStatusChange(null, 'Applied', app.status)
 
   const width = Math.max(
@@ -1097,6 +1191,7 @@ export async function appendSheetApplication(options: {
     columns.lastUpdated ?? 0,
     columns.oaComplete ?? 0,
     columns.highestStage ?? 0,
+    stampOffer ? (columns.offerDate ?? 0) : 0,
   )
   const row = Array.from({ length: width + 1 }, () => '')
   row[columns.company] = app.company
@@ -1109,6 +1204,9 @@ export async function appendSheetApplication(options: {
   }
   if (columns.highestStage !== null) {
     row[columns.highestStage] = initialHighest
+  }
+  if (stampOffer && columns.offerDate !== null) {
+    row[columns.offerDate] = options.lastUpdatedStamp
   }
 
   const range = a1RangeForSheet(options.sheetTitle, 'A:Z')
@@ -1324,11 +1422,12 @@ const ASSESSMENT_HEADER_ROW = [
   'Scheduled For',
   'Calendar Event',
 ]
-const INTERVIEW_HEADER_ROW = ['Company', 'Date & Time', 'End Time', 'Notes', 'Complete', 'App Row']
-const SCREENING_HEADER_ROW = ['Company', 'Date & Time', 'End Time', 'Notes', 'App Row']
+const INTERVIEW_HEADER_ROW = ['Company', 'Date & Time', 'End Time', 'Date Offered', 'Notes', 'Complete', 'App Row']
+const SCREENING_HEADER_ROW = ['Company', 'Date & Time', 'End Time', 'Date Offered', 'Notes', 'App Row']
 /** Columns added to an existing linked tab (after its last header) when it doesn't have them yet. */
 const ADDED_LINKED_HEADERS = {
   endTime: 'End Time',
+  dateOffered: 'Date Offered',
   appRow: 'App Row',
   scheduled: 'Scheduled For',
   calendarEvent: 'Calendar Event',
@@ -1476,7 +1575,7 @@ export async function appendInterviewEntry(options: {
     accessToken: options.accessToken,
     sheetTitle,
     defaultHeader: INTERVIEW_HEADER_ROW,
-    addHeaders: ['endTime'],
+    addHeaders: ['endTime', 'dateOffered'],
   })
   const { columns } = parseInterviewSheet([headers])
   if (!columns) {
@@ -1486,6 +1585,7 @@ export async function appendInterviewEntry(options: {
   const appRow = options.input.appRow ?? null
   const dateTime = formatSheetDateTime(options.input.dateTime) || options.input.dateTime
   const endTime = formatEndTime(options.input.endTime)
+  const dateOffered = formatDisplayDate(options.input.dateOffered ?? '') || (options.input.dateOffered ?? '')
   const sheetRow = await appendRow({
     spreadsheetId: options.spreadsheetId,
     accessToken: options.accessToken,
@@ -1494,6 +1594,7 @@ export async function appendInterviewEntry(options: {
       [columns.company, options.input.company],
       [columns.dateTime, dateTime],
       [columns.endTime, endTime],
+      [columns.dateOffered, dateOffered],
       [columns.notes, options.input.notes],
       [columns.complete, 'No'],
       [columns.appRow, appRow === null ? '' : String(appRow)],
@@ -1505,6 +1606,7 @@ export async function appendInterviewEntry(options: {
     company: options.input.company,
     dateTime,
     endTime,
+    dateOffered,
     notes: options.input.notes,
     complete: false,
     appRow,
@@ -1526,7 +1628,7 @@ export async function appendScreeningEntry(options: {
     accessToken: options.accessToken,
     sheetTitle,
     defaultHeader: SCREENING_HEADER_ROW,
-    addHeaders: ['endTime'],
+    addHeaders: ['endTime', 'dateOffered'],
   })
   const { columns } = parseScreeningSheet([headers])
   if (!columns) {
@@ -1536,6 +1638,7 @@ export async function appendScreeningEntry(options: {
   const appRow = options.input.appRow ?? null
   const dateTime = formatSheetDateTime(options.input.dateTime) || options.input.dateTime
   const endTime = formatEndTime(options.input.endTime)
+  const dateOffered = formatDisplayDate(options.input.dateOffered ?? '') || (options.input.dateOffered ?? '')
   const sheetRow = await appendRow({
     spreadsheetId: options.spreadsheetId,
     accessToken: options.accessToken,
@@ -1544,6 +1647,7 @@ export async function appendScreeningEntry(options: {
       [columns.company, options.input.company],
       [columns.dateTime, dateTime],
       [columns.endTime, endTime],
+      [columns.dateOffered, dateOffered],
       [columns.notes, options.input.notes],
       [columns.appRow, appRow === null ? '' : String(appRow)],
     ]),
@@ -1554,6 +1658,7 @@ export async function appendScreeningEntry(options: {
     company: options.input.company,
     dateTime,
     endTime,
+    dateOffered,
     notes: options.input.notes,
     appRow,
     sheetRow,
@@ -1794,7 +1899,7 @@ export async function updateDateEntry<E extends InterviewEntry | ScreeningEntry>
     accessToken: options.accessToken,
     sheetTitle,
     defaultHeader: DEFAULT_LINKED_HEADERS[options.kind],
-    addHeaders: ['endTime'],
+    addHeaders: ['endTime', 'dateOffered'],
   })
   const columns =
     options.kind === 'Interview' ? parseInterviewSheet([headers]).columns : parseScreeningSheet([headers]).columns
@@ -1804,6 +1909,7 @@ export async function updateDateEntry<E extends InterviewEntry | ScreeningEntry>
 
   const dateTime = formatSheetDateTime(options.input.dateTime) || options.input.dateTime
   const endTime = formatEndTime(options.input.endTime)
+  const dateOffered = formatDisplayDate(options.input.dateOffered ?? '') || (options.input.dateOffered ?? '')
   await putRowCells({
     spreadsheetId: options.spreadsheetId,
     accessToken: options.accessToken,
@@ -1813,11 +1919,19 @@ export async function updateDateEntry<E extends InterviewEntry | ScreeningEntry>
       [columns.company, options.input.company],
       [columns.dateTime, dateTime],
       [columns.endTime, endTime],
+      [columns.dateOffered, dateOffered],
       [columns.notes, options.input.notes],
     ],
   })
 
-  return { ...options.entry, company: options.input.company, dateTime, endTime, notes: options.input.notes }
+  return {
+    ...options.entry,
+    company: options.input.company,
+    dateTime,
+    endTime,
+    dateOffered,
+    notes: options.input.notes,
+  }
 }
 
 /** Local-state version of shiftLinkedAppRows. */

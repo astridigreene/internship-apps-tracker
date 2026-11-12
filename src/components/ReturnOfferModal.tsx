@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { formatPay, parsePay, type ReturnOffer } from '../types'
+import { parseSheetDate, toDateInputValue } from '../lib/time'
 
 interface ReturnOfferModalProps {
   open: boolean
@@ -11,7 +12,7 @@ interface ReturnOfferModalProps {
   onSave?: (offer: ReturnOffer | null) => Promise<void>
 }
 
-const EMPTY: ReturnOffer = { company: '', location: '', role: '', pay: '' }
+const EMPTY: ReturnOffer = { company: '', location: '', role: '', pay: '', dateOffered: '' }
 
 /** Add / edit / remove the year's single return offer. */
 export function ReturnOfferModal({ open, offer, saving, onClose, onSave }: ReturnOfferModalProps) {
@@ -25,7 +26,16 @@ export function ReturnOfferModal({ open, offer, saving, onClose, onSave }: Retur
       return
     }
     const pay = offer ? parsePay(offer.pay) : null
-    setForm(offer ? { ...offer, pay: pay === null ? offer.pay : String(pay) } : EMPTY)
+    const offered = offer ? parseSheetDate(offer.dateOffered) : null
+    setForm(
+      offer
+        ? {
+            ...offer,
+            pay: pay === null ? offer.pay : String(pay),
+            dateOffered: offered ? toDateInputValue(offered) : offer.dateOffered,
+          }
+        : EMPTY,
+    )
     setError(null)
     const id = window.setTimeout(() => firstFieldRef.current?.focus(), 0)
     return () => window.clearTimeout(id)
@@ -144,6 +154,15 @@ export function ReturnOfferModal({ open, offer, saving, onClose, onSave }: Retur
               placeholder="e.g. 45"
               value={form.pay}
               onChange={(e) => setForm((f) => ({ ...f, pay: e.target.value }))}
+              className={fieldClass}
+            />
+          </label>
+          <label className={labelClass}>
+            Date Offered
+            <input
+              type="date"
+              value={form.dateOffered}
+              onChange={(e) => setForm((f) => ({ ...f, dateOffered: e.target.value }))}
               className={fieldClass}
             />
           </label>

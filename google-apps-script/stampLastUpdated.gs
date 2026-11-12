@@ -1,5 +1,6 @@
 /**
- * Optional Apps Script: stamp Last Updated whenever Status changes in the Sheet.
+ * Optional Apps Script: stamp Last Updated whenever Status changes in the Sheet,
+ * and stamp Offer Date (if blank) when Status becomes Offer.
  *
  * Setup:
  * 1. Add a "Last Updated" column header on each year tab (or let the dashboard create it).
@@ -8,6 +9,8 @@
  */
 
 var LAST_UPDATED_HEADER = 'Last Updated'
+var OFFER_DATE_HEADER = 'Offer Date'
+var OFFER_DATE_ALIASES = ['offer date', 'date offered', 'offered on', 'offer received', 'date of offer']
 
 /**
  * Installable onEdit entrypoint — stamps Last Updated when Status is edited.
@@ -47,9 +50,34 @@ function stampStatusUpdated(e) {
     sheet.getRange(1, updatedCol + 1).setValue(LAST_UPDATED_HEADER)
   }
 
-  sheet.getRange(row, updatedCol + 1).setValue(
-    Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'M/d/yyyy'),
-  )
+  var today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'M/d/yyyy')
+  sheet.getRange(row, updatedCol + 1).setValue(today)
+
+  var status = String(sheet.getRange(row, statusCol + 1).getValue() || '').trim().toLowerCase()
+  if (status === 'offer') {
+    _stampOfferDate_(sheet, row, today)
+  }
+}
+
+/** Fill Offer Date with today when it's blank (adds the column on first use). */
+function _stampOfferDate_(sheet, row, today) {
+  // Re-read headers: Last Updated may have just been added.
+  var headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0]
+  var offerCol = -1
+  for (var i = 0; i < OFFER_DATE_ALIASES.length && offerCol < 0; i++) {
+    offerCol = _findHeaderColumn_(headers, OFFER_DATE_ALIASES[i])
+  }
+  if (offerCol < 0) {
+    offerCol = headers.length
+    while (offerCol > 0 && String(headers[offerCol - 1] || '').trim() === '') {
+      offerCol--
+    }
+    sheet.getRange(1, offerCol + 1).setValue(OFFER_DATE_HEADER)
+  }
+  var cell = sheet.getRange(row, offerCol + 1)
+  if (String(cell.getValue() || '').trim() === '') {
+    cell.setValue(today)
+  }
 }
 
 function _findHeaderColumn_(headers, name) {

@@ -154,6 +154,8 @@ export interface Application {
   oaComplete: OaComplete | null
   /** Offer pay in $/hr as written in the Pay column; '' when blank or the column is absent. */
   pay: string
+  /** When the offer came in (Date Offered column); '' when blank or the column is absent. */
+  offerDate: string
   /** 1-based row number in the Google Sheet tab (includes header offset). */
   sheetRow: number
 }
@@ -190,6 +192,8 @@ export interface ReturnOffer {
   role: string
   /** $/hr, same format as Application.pay. */
   pay: string
+  /** When the return offer came in; '' when not set. */
+  dateOffered: string
 }
 
 /** Effective highest stage for an application, falling back when the column is absent. */
@@ -219,6 +223,7 @@ export interface SheetColumns {
   oaComplete: number | null
   highestStage: number | null
   pay: number | null
+  offerDate: number | null
 }
 
 export interface Stats {
@@ -277,6 +282,8 @@ export interface InterviewEntry {
   dateTime: string
   /** Time of day it ends (End Time column), e.g. "11:45 AM"; '' when not set. */
   endTime: string
+  /** When the invite came in (Date Offered column); '' when not set. */
+  dateOffered: string
   notes: string
   complete: boolean
   /** Row of the application this belongs to on the year tab (App Row column), if recorded. */
@@ -289,6 +296,8 @@ export interface NewInterviewInput {
   dateTime: string
   /** Time of day it ends, as HH:MM (from `<input type="time">`); optional. */
   endTime?: string
+  /** When the invite came in, as YYYY-MM-DD (from `<input type="date">`); optional. */
+  dateOffered?: string
   notes: string
   /** Year-tab row of the application this belongs to. */
   appRow?: number
@@ -300,6 +309,8 @@ export interface ScreeningEntry {
   dateTime: string
   /** Time of day it ends (End Time column), e.g. "11:45 AM"; '' when not set. */
   endTime: string
+  /** When the invite came in (Date Offered column); '' when not set. */
+  dateOffered: string
   notes: string
   /** Row of the application this belongs to on the year tab (App Row column), if recorded. */
   appRow: number | null
@@ -311,6 +322,8 @@ export interface NewScreeningInput {
   dateTime: string
   /** Time of day it ends, as HH:MM (from `<input type="time">`); optional. */
   endTime?: string
+  /** When the invite came in, as YYYY-MM-DD (from `<input type="date">`); optional. */
+  dateOffered?: string
   notes: string
   /** Year-tab row of the application this belongs to. */
   appRow?: number
@@ -335,6 +348,7 @@ export interface InterviewSheetColumns {
   company: number
   dateTime: number
   endTime: number | null
+  dateOffered: number | null
   notes: number | null
   complete: number | null
   appRow: number | null
@@ -345,6 +359,7 @@ export interface ScreeningSheetColumns {
   company: number
   dateTime: number
   endTime: number | null
+  dateOffered: number | null
   notes: number | null
   appRow: number | null
 }
@@ -441,6 +456,8 @@ export interface NeetCodeData {
 export interface LinkedActions {
   /** Write an application's Pay ($/hr) cell; '' clears it. */
   updatePay: (app: Application, pay: string) => Promise<void>
+  /** Write an application's offer Date Offered cell (YYYY-MM-DD from a date input); '' clears it. */
+  updateOfferDate: (app: Application, date: string) => Promise<void>
   addOa: (input: NewAssessmentInput) => Promise<void>
   addHireVue: (input: NewAssessmentInput) => Promise<void>
   addInterview: (input: NewInterviewInput) => Promise<void>

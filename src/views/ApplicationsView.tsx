@@ -528,7 +528,14 @@ export function ApplicationsView({
           {returnOffer ? (
             <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">
               <span className="font-bold">{returnOffer.company}</span>
-              {[returnOffer.role, returnOffer.location, formatPay(returnOffer.pay)]
+              {[
+                returnOffer.role,
+                returnOffer.location,
+                formatPay(returnOffer.pay),
+                returnOffer.dateOffered
+                  ? `Offered ${formatDisplayDate(returnOffer.dateOffered) || returnOffer.dateOffered}`
+                  : '',
+              ]
                 .filter(Boolean)
                 .map((part) => ` · ${part}`)
                 .join('')}
@@ -589,7 +596,12 @@ export function ApplicationsView({
                       </div>
                       <p className="mt-1 text-[13px] font-semibold text-app-text">{app.role}</p>
                       <p className="mt-1 text-[12px] font-semibold text-app-text-weak">
-                        {[app.location, formatDisplayDate(app.dateApplied) || app.dateApplied, formatPay(app.pay)]
+                        {[
+                          app.location,
+                          formatDisplayDate(app.dateApplied) || app.dateApplied,
+                          formatPay(app.pay),
+                          app.offerDate ? `Offered ${formatDisplayDate(app.offerDate) || app.offerDate}` : '',
+                        ]
                           .filter(Boolean)
                           .join(' · ')}
                       </p>
@@ -693,9 +705,11 @@ export function ApplicationsView({
                       ) : (
                         <span className="flex min-w-0 items-center gap-1.5">
                           <StatusPill status={status} />
-                          {app.pay ? (
+                          {app.pay || app.offerDate ? (
                             <span className="truncate text-[12px] font-semibold text-app-text-weak tabular-nums">
-                              {formatPay(app.pay)}
+                              {[formatPay(app.pay), formatDisplayDate(app.offerDate) || app.offerDate]
+                                .filter(Boolean)
+                                .join(' · ')}
                             </span>
                           ) : null}
                         </span>

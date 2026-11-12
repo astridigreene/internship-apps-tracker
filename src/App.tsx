@@ -46,12 +46,14 @@ import {
   SheetSetupError,
   shiftAppRowAfterDelete,
   shiftLinkedAppRows,
+  shouldStampOfferDate,
   updateAssessmentCalendarEvent,
   updateAssessmentEntry,
   updateDateEntry,
   updateLinkedAppRow,
   updateLinkedComplete,
   type LinkedKind,
+  updateSheetOfferDate,
   updateSheetPay,
   updateSheetStatus,
 } from './lib/sheet'
@@ -606,7 +608,8 @@ export default function App() {
         return row
       }
       const highestStage = deriveHighestStageOnStatusChange(row.highestStage, row.status, nextStatus)
-      return { ...row, status: nextStatus, lastUpdated: stamp, highestStage }
+      const offerDate = shouldStampOfferDate(nextStatus, row.offerDate) ? stamp : row.offerDate
+      return { ...row, status: nextStatus, lastUpdated: stamp, highestStage, offerDate }
     })
     setData({
       ...data,
@@ -628,6 +631,7 @@ export default function App() {
           status: change.toStatus,
           currentStatus: change.app.status,
           currentHighestStage: change.app.highestStage,
+          currentOfferDate: change.app.offerDate,
           lastUpdatedStamp: stamp,
         })
       }
@@ -673,6 +677,7 @@ export default function App() {
         highestStage: deriveHighestStageOnStatusChange(null, 'Applied', application.status),
         oaComplete: null,
         pay: '',
+        offerDate: shouldStampOfferDate(application.status, '') ? stamp : '',
         sheetRow,
       }
       const nextApps = [...data.applications, nextApp]
@@ -790,6 +795,42 @@ export default function App() {
       )
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Could not save pay'
+      setError(message)
+      throw err instanceof Error ? err : new Error(message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleUpdateOfferDate(app: Application, date: string) {
+    if (!accessToken || !data || !sheetId) {
+      return
+    }
+    setError(null)
+    setSaving(true)
+    try {
+      const token = await ensureFreshToken()
+      const { columns, offerDate } = await updateSheetOfferDate({
+        spreadsheetId: sheetId,
+        accessToken: token,
+        sheetTitle: selectedYear,
+        sheetRow: app.sheetRow,
+        columns: data.columns,
+        date,
+      })
+      setData((current) =>
+        current
+          ? {
+              ...current,
+              columns,
+              applications: current.applications.map((row) =>
+                row.sheetRow === app.sheetRow ? { ...row, offerDate } : row,
+              ),
+            }
+          : current,
+      )
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not save offer date'
       setError(message)
       throw err instanceof Error ? err : new Error(message)
     } finally {
@@ -1358,6 +1399,7 @@ export default function App() {
 
   const linkedActions: LinkedActions = {
     updatePay: handleUpdatePay,
+    updateOfferDate: handleUpdateOfferDate,
     addOa: (input) => handleAddAssessment('OA', input),
     addHireVue: (input) => handleAddAssessment('HireVue', input),
     addInterview: handleAddInterview,
