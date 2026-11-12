@@ -5,7 +5,9 @@ import {
   formatTimeOfDay,
   hasMeetingEnded,
   parseSheetDate,
+  formatDisplayDate,
   parseTimeOfDay,
+  toDateInputValue,
   toDateTimeInputValue,
   toTimeInputValue,
 } from '../lib/time'
@@ -28,16 +30,24 @@ interface DateEntriesPanelProps<E extends Entry> {
   onEdit?: (entry: E, input: Input) => Promise<void>
 }
 
-const EMPTY = (company: string): Input => ({ company, dateTime: '', endTime: '', notes: '' })
+const EMPTY = (company: string): Input => ({
+  company,
+  dateTime: '',
+  endTime: '',
+  dateOffered: '',
+  notes: '',
+})
 
 /** An entry's sheet values in the shapes the form inputs expect. */
 function formFromEntry(entry: Entry): Input {
   const start = parseSheetDate(entry.dateTime)
   const endMinutes = parseTimeOfDay(entry.endTime)
+  const offered = parseSheetDate(entry.dateOffered)
   return {
     company: entry.company,
     dateTime: start ? toDateTimeInputValue(start) : entry.dateTime,
     endTime: endMinutes === null ? '' : toTimeInputValue(endMinutes),
+    dateOffered: offered ? toDateInputValue(offered) : entry.dateOffered,
     notes: entry.notes,
   }
 }
@@ -149,6 +159,15 @@ export function DateEntriesPanel<E extends Entry>({
         </label>
       </div>
       <label className="block text-[10px] font-bold uppercase text-app-text-weak">
+        Date Offered
+        <input
+          type="date"
+          value={form.dateOffered ?? ''}
+          onChange={(e) => setForm((f) => ({ ...f, dateOffered: e.target.value }))}
+          className={fieldClass}
+        />
+      </label>
+      <label className="block text-[10px] font-bold uppercase text-app-text-weak">
         Notes
         <input
           value={form.notes}
@@ -217,8 +236,17 @@ export function DateEntriesPanel<E extends Entry>({
                     {formatDisplayDateTime(entry.dateTime) || entry.dateTime || 'No date/time'}
                     {end ? ` – ${end}` : ''}
                   </p>
-                  {entry.notes ? (
-                    <p className="truncate text-[11px] text-app-text-weak">{entry.notes}</p>
+                  {entry.dateOffered || entry.notes ? (
+                    <p className="truncate text-[11px] text-app-text-weak">
+                      {[
+                        entry.dateOffered
+                          ? `Offered ${formatDisplayDate(entry.dateOffered) || entry.dateOffered}`
+                          : '',
+                        entry.notes,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </p>
                   ) : null}
                   {entry.appRow === null && onLink ? (
                     <UnlinkedNote disabled={disabled} onLink={() => onLink(entry)} />

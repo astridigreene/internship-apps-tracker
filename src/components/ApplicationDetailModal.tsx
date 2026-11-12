@@ -16,7 +16,7 @@ import { StatusPill } from './StatusPill'
 import { StatusSelect } from './StatusSelect'
 import { AssessmentPanel } from './AssessmentPanel'
 import { DateEntriesPanel } from './DateEntriesPanel'
-import { formatDisplayDate } from '../lib/time'
+import { formatDisplayDate, parseSheetDate, toDateInputValue } from '../lib/time'
 
 interface ApplicationDetailModalProps {
   app: Application | null
@@ -46,6 +46,8 @@ export function ApplicationDetailModal({
   const [error, setError] = useState<string | null>(null)
   const [editingPay, setEditingPay] = useState(false)
   const [draftPay, setDraftPay] = useState('')
+  const [editingOfferDate, setEditingOfferDate] = useState(false)
+  const [draftOfferDate, setDraftOfferDate] = useState('')
 
   useEffect(() => {
     if (!app) {
@@ -55,6 +57,7 @@ export function ApplicationDetailModal({
     setDraftStatus(app.status)
     setError(null)
     setEditingPay(false)
+    setEditingOfferDate(false)
   }, [app])
 
   useEffect(() => {
@@ -116,6 +119,26 @@ export function ApplicationDetailModal({
       setEditingPay(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save pay')
+    }
+  }
+
+  function startOfferDateEdit() {
+    const d = parseSheetDate(current.offerDate)
+    setDraftOfferDate(d ? toDateInputValue(d) : '')
+    setEditingOfferDate(true)
+    setError(null)
+  }
+
+  async function saveOfferDate() {
+    if (!linkedActions || saving) {
+      return
+    }
+    setError(null)
+    try {
+      await linkedActions.updateOfferDate(current, draftOfferDate)
+      setEditingOfferDate(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save offer date')
     }
   }
 
@@ -243,6 +266,60 @@ export function ApplicationDetailModal({
                       className="text-[12px] font-bold text-app-brand hover:underline disabled:opacity-50"
                     >
                       {current.pay ? 'Edit' : 'Add pay'}
+                    </button>
+                  ) : null}
+                </div>
+              )}
+            </div>
+          ) : null}
+          {highest === 'Offer' ? (
+            <div>
+              <p className={fieldLabel}>Date Offered</p>
+              {editingOfferDate ? (
+                <form
+                  className="mt-1.5 flex flex-wrap items-center gap-2"
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    void saveOfferDate()
+                  }}
+                >
+                  <input
+                    type="date"
+                    autoFocus
+                    value={draftOfferDate}
+                    disabled={saving}
+                    onChange={(e) => setDraftOfferDate(e.target.value)}
+                    className="h-9 rounded border border-app-border bg-app-surface px-2.5 text-[13px] font-semibold text-app-text outline-none focus:border-app-brand"
+                  />
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={() => setEditingOfferDate(false)}
+                    className="h-9 rounded border border-app-border px-3 text-[12px] font-bold text-app-text hover:bg-app-hover disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="h-9 rounded bg-app-brand px-3 text-[12px] font-bold text-white hover:bg-app-brand-dark disabled:cursor-not-allowed disabled:opacity-45 dark:text-teal-950"
+                  >
+                    {saving ? 'Saving…' : 'Save'}
+                  </button>
+                </form>
+              ) : (
+                <div className="mt-1 flex items-center gap-2">
+                  <p className="text-[14px] font-semibold text-app-text tabular-nums">
+                    {formatDisplayDate(current.offerDate) || '—'}
+                  </p>
+                  {linkedActions ? (
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={startOfferDateEdit}
+                      className="text-[12px] font-bold text-app-brand hover:underline disabled:opacity-50"
+                    >
+                      {current.offerDate ? 'Edit' : 'Add date'}
                     </button>
                   ) : null}
                 </div>

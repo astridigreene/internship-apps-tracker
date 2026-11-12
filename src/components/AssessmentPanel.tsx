@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { SavedWithWarningError, type AssessmentEntry, type NewAssessmentInput } from '../types'
 import {
+  formatDisplayDate,
   formatDisplayDateTime,
   isExpired,
   parseSheetDate,
@@ -280,7 +281,13 @@ export function AssessmentPanel({
                     </div>
                   ) : null}
                   <p className="truncate text-[11px] text-app-text-weak">
-                    {[entry.site, entry.lengthMinutes ? `${entry.lengthMinutes} min` : '']
+                    {[
+                      entry.dateOffered
+                        ? `Offered ${formatDisplayDate(entry.dateOffered) || entry.dateOffered}`
+                        : '',
+                      entry.site,
+                      entry.lengthMinutes ? `${entry.lengthMinutes} min` : '',
+                    ]
                       .filter(Boolean)
                       .join(' · ') || '—'}
                   </p>
