@@ -56,6 +56,10 @@ export const OPTIONAL_COLUMN_GUIDE = [
     label: 'Offer Date',
     hint: 'Stamped when an application is marked Offer',
   },
+  {
+    label: 'Notes',
+    hint: 'Free-form notes per application — added when you first save one',
+  },
 ] as const
 
 /** Optional sibling tabs per year (e.g. "2027 OA") — created automatically on first use. */
@@ -145,6 +149,7 @@ const HEADER_ALIASES: Record<string, string[]> = {
   highestStage: ['highest stage', 'highest', 'furthest stage', 'best stage', 'stage reached'],
   pay: ['pay ($/hr)', 'pay', 'pay/hr', 'pay per hour', '$/hr', 'hourly pay', 'hourly rate', 'hourly'],
   offerDate: ['offer date', 'date offered', 'offered on', 'offer received', 'date of offer'],
+  notes: ['notes', 'note', 'comments'],
 }
 
 const PAY_HEADER_LABEL = 'Pay ($/hr)'
@@ -190,7 +195,7 @@ export function normalizeStatus(raw: string): string {
   if (!value) {
     return 'Applied'
   }
-  const known = ['Applied', 'Progressed', 'Interview', 'Offer', 'Rejected']
+  const known = ['Applied', 'Progressed', 'Interview', 'Offer', 'Rejected', 'Withdrew']
   const match = known.find((s) => s.toLowerCase() === value.toLowerCase())
   if (match) {
     return match
@@ -341,6 +346,7 @@ export function parseSheetValues(values: string[][]): {
     highestStage: resolveColumnIndex(headerMap, HEADER_ALIASES.highestStage),
     pay: resolveColumnIndex(headerMap, HEADER_ALIASES.pay),
     offerDate: resolveColumnIndex(headerMap, HEADER_ALIASES.offerDate),
+    notes: resolveColumnIndex(headerMap, HEADER_ALIASES.notes),
   }
 
   const missingLabels: string[] = []
@@ -371,6 +377,7 @@ export function parseSheetValues(values: string[][]): {
     highestStage: resolved.highestStage ?? null,
     pay: resolved.pay ?? null,
     offerDate: resolved.offerDate ?? null,
+    notes: resolved.notes ?? null,
   }
 
   const cellAt = (row: string[], idx: number | undefined | null) =>
@@ -413,6 +420,7 @@ export function parseSheetValues(values: string[][]): {
       oaComplete,
       pay: cellAt(row, columns.pay),
       offerDate: formatDisplayDate(cellAt(row, columns.offerDate)) || cellAt(row, columns.offerDate),
+      notes: cellAt(row, columns.notes),
       sheetRow: i + 1,
     })
   }
@@ -964,6 +972,46 @@ export async function updateSheetPay(options: {
     values: [[options.pay.trim()]],
   })
   return columns
+}
+
+/**
+ * Keep free text literal under USER_ENTERED: a leading =, +, - or @ (e.g. a
+ * "- bullet" line) would otherwise be parsed as a formula. The apostrophe
+ * isn't shown in the sheet or read back.
+ */
+export function asSheetText(value: string): string {
+  return /^[=+\-@]/.test(value) ? `'${value}` : value
+}
+
+/** Write an application's Notes, adding the column on first use. Returns updated columns. */
+export async function updateSheetNotes(options: {
+  spreadsheetId: string
+  accessToken: string
+  sheetTitle: string
+  sheetRow: number
+  columns: SheetColumns
+  notes: string
+}): Promise<SheetColumns> {
+  let col = options.columns.notes
+  if (col === null) {
+    const values = await fetchSheetValues(options.spreadsheetId, options.accessToken, options.sheetTitle, 'A1:Z1')
+    col = await ensureHeaderColumn({
+      spreadsheetId: options.spreadsheetId,
+      accessToken: options.accessToken,
+      sheetTitle: options.sheetTitle,
+      headerRow: values[0] ?? [],
+      aliases: HEADER_ALIASES.notes,
+      headerLabel: 'Notes',
+    })
+  }
+  await putSheetValues({
+    spreadsheetId: options.spreadsheetId,
+    accessToken: options.accessToken,
+    sheetTitle: options.sheetTitle,
+    startCell: `${columnLetter(col)}${options.sheetRow}`,
+    values: [[asSheetText(options.notes.trim())]],
+  })
+  return { ...options.columns, notes: col }
 }
 
 /** Write an application's Offer Date, adding the column on first use. Returns updated columns. */
@@ -1595,7 +1643,7 @@ export async function appendInterviewEntry(options: {
       [columns.dateTime, dateTime],
       [columns.endTime, endTime],
       [columns.dateOffered, dateOffered],
-      [columns.notes, options.input.notes],
+      [columns.notes, asSheetText(options.input.notes)],
       [columns.complete, 'No'],
       [columns.appRow, appRow === null ? '' : String(appRow)],
     ]),
@@ -1648,7 +1696,7 @@ export async function appendScreeningEntry(options: {
       [columns.dateTime, dateTime],
       [columns.endTime, endTime],
       [columns.dateOffered, dateOffered],
-      [columns.notes, options.input.notes],
+      [columns.notes, asSheetText(options.input.notes)],
       [columns.appRow, appRow === null ? '' : String(appRow)],
     ]),
     verifyValue: options.input.company,
@@ -1920,7 +1968,7 @@ export async function updateDateEntry<E extends InterviewEntry | ScreeningEntry>
       [columns.dateTime, dateTime],
       [columns.endTime, endTime],
       [columns.dateOffered, dateOffered],
-      [columns.notes, options.input.notes],
+      [columns.notes, asSheetText(options.input.notes)],
     ],
   })
 

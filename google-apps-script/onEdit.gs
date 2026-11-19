@@ -33,6 +33,7 @@ var VALID_STATUSES = {
   Interview: true,
   Offer: true,
   Rejected: true,
+  Withdrew: true,
 }
 
 /**

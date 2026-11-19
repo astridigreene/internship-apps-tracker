@@ -49,6 +49,8 @@
   --color-status-offer-text: #065f46;
   --color-status-rejected-bg: #ffe4e6;
   --color-status-rejected-text: #9f1239;
+  --color-status-withdrew-bg: #e2e8f0;
+  --color-status-withdrew-text: #334155;
 
   --color-chart-grid: #d5e4ea;
   --color-chart-tick: #5b7c86;
@@ -107,6 +109,8 @@ html.dark {
   --color-status-offer-text: #a7f3d0;
   --color-status-rejected-bg: #881337;
   --color-status-rejected-text: #fecdd3;
+  --color-status-withdrew-bg: #334155;
+  --color-status-withdrew-text: #cbd5e1;
 
   --color-chart-grid: #24383c;
   --color-chart-tick: #94b8bd;

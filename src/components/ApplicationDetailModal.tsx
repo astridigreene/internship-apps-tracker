@@ -2,7 +2,7 @@ import { useEffect, useId, useState } from 'react'
 import {
   effectiveHighestStage,
   formatPay,
-  isRejectedStatus,
+  isClosedStatus,
   parsePay,
   nextPipelineStatus,
   type Application,
@@ -48,6 +48,8 @@ export function ApplicationDetailModal({
   const [draftPay, setDraftPay] = useState('')
   const [editingOfferDate, setEditingOfferDate] = useState(false)
   const [draftOfferDate, setDraftOfferDate] = useState('')
+  const [editingNotes, setEditingNotes] = useState(false)
+  const [draftNotes, setDraftNotes] = useState('')
 
   useEffect(() => {
     if (!app) {
@@ -58,6 +60,7 @@ export function ApplicationDetailModal({
     setError(null)
     setEditingPay(false)
     setEditingOfferDate(false)
+    setEditingNotes(false)
   }, [app])
 
   useEffect(() => {
@@ -80,7 +83,7 @@ export function ApplicationDetailModal({
   const current = app
   const currentStatus = current.status
   const next = nextPipelineStatus(currentStatus)
-  const alreadyRejected = isRejectedStatus(currentStatus)
+  const alreadyClosed = isClosedStatus(currentStatus)
   const canWrite = Boolean(onUpdateStatus)
   const highest = effectiveHighestStage(current)
   const showLinked = highest !== 'Applied' && Boolean(linked)
@@ -139,6 +142,19 @@ export function ApplicationDetailModal({
       setEditingOfferDate(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save offer date')
+    }
+  }
+
+  async function saveNotes() {
+    if (!linkedActions || saving) {
+      return
+    }
+    setError(null)
+    try {
+      await linkedActions.updateNotes(current, draftNotes)
+      setEditingNotes(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save notes')
     }
   }
 
@@ -341,6 +357,74 @@ export function ApplicationDetailModal({
             </div>
           </div>
 
+          <div>
+            <div className="flex items-center gap-2">
+              <p className={fieldLabel}>Notes</p>
+              {linkedActions && !editingNotes ? (
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => {
+                    setDraftNotes(current.notes)
+                    setEditingNotes(true)
+                    setError(null)
+                  }}
+                  className="text-[12px] font-bold text-app-brand hover:underline disabled:opacity-50"
+                >
+                  {current.notes ? 'Edit' : 'Add notes'}
+                </button>
+              ) : null}
+            </div>
+            {editingNotes ? (
+              <form
+                className="mt-1.5 space-y-2"
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  void saveNotes()
+                }}
+              >
+                <textarea
+                  autoFocus
+                  rows={10}
+                  value={draftNotes}
+                  disabled={saving}
+                  placeholder="Recruiter contact, why you withdrew, paste an email…"
+                  onChange={(e) => setDraftNotes(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                      e.preventDefault()
+                      void saveNotes()
+                    }
+                  }}
+                  className="block min-h-48 w-full resize-y rounded border border-app-border bg-app-surface px-2.5 py-2 text-[13px] leading-relaxed text-app-text outline-none focus:border-app-brand"
+                />
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={() => setEditingNotes(false)}
+                    className="h-9 rounded border border-app-border px-3 text-[12px] font-bold text-app-text hover:bg-app-hover disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="h-9 rounded bg-app-brand px-3 text-[12px] font-bold text-white hover:bg-app-brand-dark disabled:cursor-not-allowed disabled:opacity-45 dark:text-teal-950"
+                  >
+                    {saving ? 'Saving…' : 'Save'}
+                  </button>
+                </div>
+              </form>
+            ) : current.notes ? (
+              <p className="mt-1 max-h-60 overflow-y-auto text-[13px] leading-relaxed whitespace-pre-wrap break-words text-app-text">
+                {current.notes}
+              </p>
+            ) : (
+              <p className={fieldValue}>—</p>
+            )}
+          </div>
+
           {error ? (
             <p className="text-[12px] font-semibold text-kpi-reject-text" role="alert">
               {error}
@@ -399,7 +483,7 @@ export function ApplicationDetailModal({
                     {saving ? 'Saving…' : next}
                   </button>
                 ) : null}
-                {!alreadyRejected ? (
+                {!alreadyClosed ? (
                   <button
                     type="button"
                     disabled={saving || !canWrite}
@@ -410,6 +494,19 @@ export function ApplicationDetailModal({
                     className="h-9 rounded border border-rose-300 bg-rose-500/10 px-3 text-[12px] font-bold text-rose-700 hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-40 dark:border-rose-500/40 dark:text-rose-300"
                   >
                     Rejected
+                  </button>
+                ) : null}
+                {!alreadyClosed ? (
+                  <button
+                    type="button"
+                    disabled={saving || !canWrite}
+                    title="Set status to Withdrew (you pulled out)"
+                    onClick={() => {
+                      void writeStatus('Withdrew')
+                    }}
+                    className="h-9 rounded border border-slate-300 bg-slate-500/10 px-3 text-[12px] font-bold text-slate-700 hover:bg-slate-500/20 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-500/40 dark:text-slate-300"
+                  >
+                    Withdrew
                   </button>
                 ) : null}
                 <button

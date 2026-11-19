@@ -53,7 +53,7 @@ export function ConnectSheetScreen({
           <p className="text-[11px] text-app-text-weak">
             Expected year tabs (e.g. <span className="font-semibold">2027</span>) with columns:
             Company, Location, Role, Date Applied, Status. Status is one of Applied, Progressed,
-            Interview, Offer, Rejected.
+            Interview, Offer, Rejected, Withdrew.
           </p>
 
           {error ? (

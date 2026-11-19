@@ -169,10 +169,12 @@ export function DateEntriesPanel<E extends Entry>({
       </label>
       <label className="block text-[10px] font-bold uppercase text-app-text-weak">
         Notes
-        <input
+        <textarea
           value={form.notes}
+          rows={6}
+          placeholder="Prep notes, who you talked to, paste the invite email…"
           onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-          className={fieldClass}
+          className="block min-h-32 w-full resize-y rounded border border-app-border bg-app-surface px-2 py-1.5 text-[12px] leading-snug font-normal normal-case text-app-text outline-none focus:border-app-brand"
         />
       </label>
       {error ? <p className="text-[11px] font-semibold text-kpi-reject-text">{error}</p> : null}
@@ -236,16 +238,14 @@ export function DateEntriesPanel<E extends Entry>({
                     {formatDisplayDateTime(entry.dateTime) || entry.dateTime || 'No date/time'}
                     {end ? ` – ${end}` : ''}
                   </p>
-                  {entry.dateOffered || entry.notes ? (
+                  {entry.dateOffered ? (
                     <p className="truncate text-[11px] text-app-text-weak">
-                      {[
-                        entry.dateOffered
-                          ? `Offered ${formatDisplayDate(entry.dateOffered) || entry.dateOffered}`
-                          : '',
-                        entry.notes,
-                      ]
-                        .filter(Boolean)
-                        .join(' · ')}
+                      Offered {formatDisplayDate(entry.dateOffered) || entry.dateOffered}
+                    </p>
+                  ) : null}
+                  {entry.notes ? (
+                    <p className="mt-0.5 line-clamp-4 text-[11px] whitespace-pre-wrap break-words text-app-text-weak" title={entry.notes}>
+                      {entry.notes}
                     </p>
                   ) : null}
                   {entry.appRow === null && onLink ? (

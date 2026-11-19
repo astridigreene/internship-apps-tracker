@@ -1,7 +1,7 @@
 export const SIMPLIFY_JOBS_URL =
   'https://simplify.jobs/jobs?query=Software%20Engineering&state=United%20States&country=United%20States&category=Backend%20Engineering%3BFull-Stack%20Engineering%3BDevOps%20Engineering%3BSoftware%20Engineering&seasons=Summer%202027&mostRecent=true&excludeApplied=true&jobType=Internship&workArrangement=In%20Person%3BHybrid'
 
-export type ApplicationStatus = 'Applied' | 'Progressed' | 'Interview' | 'Offer' | 'Rejected'
+export type ApplicationStatus = 'Applied' | 'Progressed' | 'Interview' | 'Offer' | 'Rejected' | 'Withdrew'
 
 export const APPLICATION_STATUSES: ApplicationStatus[] = [
   'Applied',
@@ -9,10 +9,22 @@ export const APPLICATION_STATUSES: ApplicationStatus[] = [
   'Interview',
   'Offer',
   'Rejected',
+  'Withdrew',
 ]
 
 export function isRejectedStatus(status: string): boolean {
   return status.trim().toLowerCase() === 'rejected'
+}
+
+/** You pulled out of consideration (accepted elsewhere, lost interest, etc.). */
+export function isWithdrewStatus(status: string): boolean {
+  const s = status.trim().toLowerCase()
+  return s === 'withdrew' || s === 'withdrawn'
+}
+
+/** No longer moving: rejected or withdrew. Neither ever lowers Highest Stage. */
+export function isClosedStatus(status: string): boolean {
+  return isRejectedStatus(status) || isWithdrewStatus(status)
 }
 
 /** Furthest pipeline point reached — set once, never moves backward for a rejection. */
@@ -35,9 +47,9 @@ export function highestStageRank(stage: string): number {
   }
 }
 
-/** Pipeline rank for progress comparisons (current status; Rejected ranks 0). */
+/** Pipeline rank for progress comparisons (current status; Rejected/Withdrew rank 0). */
 export function statusRank(status: string): number {
-  if (isRejectedStatus(status)) {
+  if (isClosedStatus(status)) {
     return 0
   }
   return highestStageRank(status)
@@ -45,7 +57,7 @@ export function statusRank(status: string): number {
 
 /** True when moving to a later pipeline stage (never for sideways/backward moves). */
 export function isForwardProgress(fromStatus: string, toStatus: string): boolean {
-  if (isRejectedStatus(toStatus)) {
+  if (isClosedStatus(toStatus)) {
     return false
   }
   return statusRank(toStatus) > statusRank(fromStatus)
@@ -76,8 +88,8 @@ export function deriveHighestStageOnStatusChange(
   toStatus: ApplicationStatus,
 ): HighestStage {
   const baseline: HighestStage =
-    currentHighest ?? (isRejectedStatus(currentStatus) ? 'Applied' : (currentStatus as HighestStage))
-  if (isRejectedStatus(toStatus)) {
+    currentHighest ?? (isClosedStatus(currentStatus) ? 'Applied' : (currentStatus as HighestStage))
+  if (isClosedStatus(toStatus)) {
     return baseline
   }
   const toRank = highestStageRank(toStatus)
@@ -100,6 +112,9 @@ export function migrateLegacyStatus(raw: string): { status: ApplicationStatus; h
       return { status: 'Rejected', highestStage: 'Interview' }
     case 'rejected':
       return { status: 'Rejected', highestStage: 'Applied' }
+    case 'withdrew':
+    case 'withdrawn':
+      return { status: 'Withdrew', highestStage: 'Applied' }
     case 'interview':
       return { status: 'Interview', highestStage: 'Interview' }
     case 'offer':
@@ -156,6 +171,8 @@ export interface Application {
   pay: string
   /** When the offer came in (Date Offered column); '' when blank or the column is absent. */
   offerDate: string
+  /** Free-form notes (Notes column); may span multiple lines. '' when blank or the column is absent. */
+  notes: string
   /** 1-based row number in the Google Sheet tab (includes header offset). */
   sheetRow: number
 }
@@ -201,7 +218,7 @@ export function effectiveHighestStage(app: Application): HighestStage {
   if (app.highestStage) {
     return app.highestStage
   }
-  return isRejectedStatus(app.status) ? 'Applied' : ((app.status as HighestStage) ?? 'Applied')
+  return isClosedStatus(app.status) ? 'Applied' : ((app.status as HighestStage) ?? 'Applied')
 }
 
 /** Required fields when creating a new application. */
@@ -224,6 +241,7 @@ export interface SheetColumns {
   highestStage: number | null
   pay: number | null
   offerDate: number | null
+  notes: number | null
 }
 
 export interface Stats {
@@ -458,6 +476,8 @@ export interface LinkedActions {
   updatePay: (app: Application, pay: string) => Promise<void>
   /** Write an application's offer Date Offered cell (YYYY-MM-DD from a date input); '' clears it. */
   updateOfferDate: (app: Application, date: string) => Promise<void>
+  /** Write an application's Notes cell; '' clears it. */
+  updateNotes: (app: Application, notes: string) => Promise<void>
   addOa: (input: NewAssessmentInput) => Promise<void>
   addHireVue: (input: NewAssessmentInput) => Promise<void>
   addInterview: (input: NewInterviewInput) => Promise<void>
