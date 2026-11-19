@@ -3,6 +3,8 @@ import {
   effectiveHighestStage,
   formatYesNo,
   isRejectedStatus,
+  normalizeOfferDecision,
+  type OfferDecision,
   migrateLegacyStatus,
   normalizeOaComplete,
   normalizeYesNo,
@@ -55,6 +57,10 @@ export const OPTIONAL_COLUMN_GUIDE = [
   {
     label: 'Offer Date',
     hint: 'Stamped when an application is marked Offer',
+  },
+  {
+    label: 'Offer Decision',
+    hint: 'Accepted, Declined or Reneged — added when you first record one',
   },
   {
     label: 'Notes',
@@ -150,6 +156,7 @@ const HEADER_ALIASES: Record<string, string[]> = {
   pay: ['pay ($/hr)', 'pay', 'pay/hr', 'pay per hour', '$/hr', 'hourly pay', 'hourly rate', 'hourly'],
   offerDate: ['offer date', 'date offered', 'offered on', 'offer received', 'date of offer'],
   notes: ['notes', 'note', 'comments'],
+  offerDecision: ['offer decision', 'decision', 'offer response', 'offer outcome'],
 }
 
 const PAY_HEADER_LABEL = 'Pay ($/hr)'
@@ -347,6 +354,7 @@ export function parseSheetValues(values: string[][]): {
     pay: resolveColumnIndex(headerMap, HEADER_ALIASES.pay),
     offerDate: resolveColumnIndex(headerMap, HEADER_ALIASES.offerDate),
     notes: resolveColumnIndex(headerMap, HEADER_ALIASES.notes),
+    offerDecision: resolveColumnIndex(headerMap, HEADER_ALIASES.offerDecision),
   }
 
   const missingLabels: string[] = []
@@ -378,6 +386,7 @@ export function parseSheetValues(values: string[][]): {
     pay: resolved.pay ?? null,
     offerDate: resolved.offerDate ?? null,
     notes: resolved.notes ?? null,
+    offerDecision: resolved.offerDecision ?? null,
   }
 
   const cellAt = (row: string[], idx: number | undefined | null) =>
@@ -421,6 +430,7 @@ export function parseSheetValues(values: string[][]): {
       pay: cellAt(row, columns.pay),
       offerDate: formatDisplayDate(cellAt(row, columns.offerDate)) || cellAt(row, columns.offerDate),
       notes: cellAt(row, columns.notes),
+      offerDecision: normalizeOfferDecision(cellAt(row, columns.offerDecision)),
       sheetRow: i + 1,
     })
   }
@@ -663,7 +673,7 @@ export function returnOfferTabName(year: string): string {
   return `${year} Return Offer`
 }
 
-const RETURN_OFFER_HEADER_ROW = ['Company', 'Location', 'Role', PAY_HEADER_LABEL, OFFER_DATE_HEADER_LABEL]
+const RETURN_OFFER_HEADER_ROW = ['Company', 'Location', 'Role', PAY_HEADER_LABEL, OFFER_DATE_HEADER_LABEL, 'Offer Decision']
 
 /** First non-empty data row of the Return Offer tab (headers matched by name). */
 function parseReturnOfferSheet(values: string[][]): ReturnOffer | null {
@@ -677,6 +687,7 @@ function parseReturnOfferSheet(values: string[][]): ReturnOffer | null {
     role: resolveColumnIndex(headerMap, HEADER_ALIASES.role),
     pay: resolveColumnIndex(headerMap, HEADER_ALIASES.pay),
     dateOffered: resolveColumnIndex(headerMap, HEADER_ALIASES.offerDate),
+    decision: resolveColumnIndex(headerMap, HEADER_ALIASES.offerDecision),
   }
   const cellAt = (row: string[], i: number | undefined) =>
     i !== undefined && i < row.length ? String(row[i] ?? '').trim() : ''
@@ -687,6 +698,7 @@ function parseReturnOfferSheet(values: string[][]): ReturnOffer | null {
       role: cellAt(row, idx.role),
       pay: cellAt(row, idx.pay),
       dateOffered: formatDisplayDate(cellAt(row, idx.dateOffered)) || cellAt(row, idx.dateOffered),
+      decision: normalizeOfferDecision(cellAt(row, idx.decision)),
     }
     if (offer.company || offer.role) {
       return offer
@@ -708,6 +720,7 @@ export async function saveReturnOffer(options: {
     role: options.offer.role.trim(),
     pay: options.offer.pay.trim(),
     dateOffered: formatDisplayDate(options.offer.dateOffered) || options.offer.dateOffered.trim(),
+    decision: options.offer.decision,
   }
   if (!offer.company || !offer.role) {
     throw new Error('A return offer needs at least a Company and Role.')
@@ -720,7 +733,10 @@ export async function saveReturnOffer(options: {
     accessToken: options.accessToken,
     sheetTitle,
     startCell: 'A1',
-    values: [RETURN_OFFER_HEADER_ROW, [offer.company, offer.location, offer.role, offer.pay, offer.dateOffered]],
+    values: [
+      RETURN_OFFER_HEADER_ROW,
+      [offer.company, offer.location, offer.role, offer.pay, offer.dateOffered, offer.decision],
+    ],
   })
   return offer
 }
@@ -983,16 +999,18 @@ export function asSheetText(value: string): string {
   return /^[=+\-@]/.test(value) ? `'${value}` : value
 }
 
-/** Write an application's Notes, adding the column on first use. Returns updated columns. */
-export async function updateSheetNotes(options: {
+/** Write one cell in an optional column (Notes, Offer Decision), adding the column on first use. */
+async function writeOptionalColumnCell(options: {
   spreadsheetId: string
   accessToken: string
   sheetTitle: string
   sheetRow: number
   columns: SheetColumns
-  notes: string
+  key: 'notes' | 'offerDecision'
+  headerLabel: string
+  value: string
 }): Promise<SheetColumns> {
-  let col = options.columns.notes
+  let col = options.columns[options.key]
   if (col === null) {
     const values = await fetchSheetValues(options.spreadsheetId, options.accessToken, options.sheetTitle, 'A1:Z1')
     col = await ensureHeaderColumn({
@@ -1000,8 +1018,8 @@ export async function updateSheetNotes(options: {
       accessToken: options.accessToken,
       sheetTitle: options.sheetTitle,
       headerRow: values[0] ?? [],
-      aliases: HEADER_ALIASES.notes,
-      headerLabel: 'Notes',
+      aliases: HEADER_ALIASES[options.key],
+      headerLabel: options.headerLabel,
     })
   }
   await putSheetValues({
@@ -1009,9 +1027,38 @@ export async function updateSheetNotes(options: {
     accessToken: options.accessToken,
     sheetTitle: options.sheetTitle,
     startCell: `${columnLetter(col)}${options.sheetRow}`,
-    values: [[asSheetText(options.notes.trim())]],
+    values: [[asSheetText(options.value.trim())]],
   })
-  return { ...options.columns, notes: col }
+  return { ...options.columns, [options.key]: col }
+}
+
+/** Write an application's Notes, adding the column on first use. Returns updated columns. */
+export function updateSheetNotes(options: {
+  spreadsheetId: string
+  accessToken: string
+  sheetTitle: string
+  sheetRow: number
+  columns: SheetColumns
+  notes: string
+}): Promise<SheetColumns> {
+  return writeOptionalColumnCell({ ...options, key: 'notes', headerLabel: 'Notes', value: options.notes })
+}
+
+/** Write an application's Offer Decision, adding the column on first use. Returns updated columns. */
+export function updateSheetOfferDecision(options: {
+  spreadsheetId: string
+  accessToken: string
+  sheetTitle: string
+  sheetRow: number
+  columns: SheetColumns
+  decision: OfferDecision
+}): Promise<SheetColumns> {
+  return writeOptionalColumnCell({
+    ...options,
+    key: 'offerDecision',
+    headerLabel: 'Offer Decision',
+    value: options.decision,
+  })
 }
 
 /** Write an application's Offer Date, adding the column on first use. Returns updated columns. */

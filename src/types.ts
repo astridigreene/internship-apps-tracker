@@ -151,6 +151,19 @@ export function formatYesNo(value: boolean): 'Yes' | 'No' {
   return value ? 'Yes' : 'No'
 }
 
+/** What you did with an offer. '' = still deciding. Reneged only follows Accepted. */
+export type OfferDecision = '' | 'Accepted' | 'Declined' | 'Reneged'
+
+export function normalizeOfferDecision(raw: string): OfferDecision {
+  const value = raw.trim().toLowerCase()
+  if (value.startsWith('accept')) return 'Accepted'
+  if (value.startsWith('declin') || value.startsWith('denied') || value.startsWith('deny') || value.startsWith('reject')) {
+    return 'Declined'
+  }
+  if (value.startsWith('reneg')) return 'Reneged'
+  return ''
+}
+
 export interface Application {
   company: string
   location: string
@@ -171,6 +184,8 @@ export interface Application {
   pay: string
   /** When the offer came in (Date Offered column); '' when blank or the column is absent. */
   offerDate: string
+  /** Accepted / Declined / Reneged (Offer Decision column); '' when undecided or the column is absent. */
+  offerDecision: OfferDecision
   /** Free-form notes (Notes column); may span multiple lines. '' when blank or the column is absent. */
   notes: string
   /** 1-based row number in the Google Sheet tab (includes header offset). */
@@ -211,6 +226,8 @@ export interface ReturnOffer {
   pay: string
   /** When the return offer came in; '' when not set. */
   dateOffered: string
+  /** Accepted / Declined / Reneged; '' while undecided. */
+  decision: OfferDecision
 }
 
 /** Effective highest stage for an application, falling back when the column is absent. */
@@ -242,6 +259,7 @@ export interface SheetColumns {
   pay: number | null
   offerDate: number | null
   notes: number | null
+  offerDecision: number | null
 }
 
 export interface Stats {
@@ -478,6 +496,8 @@ export interface LinkedActions {
   updateOfferDate: (app: Application, date: string) => Promise<void>
   /** Write an application's Notes cell; '' clears it. */
   updateNotes: (app: Application, notes: string) => Promise<void>
+  /** Write an application's Offer Decision cell; '' clears it. */
+  updateOfferDecision: (app: Application, decision: OfferDecision) => Promise<void>
   addOa: (input: NewAssessmentInput) => Promise<void>
   addHireVue: (input: NewAssessmentInput) => Promise<void>
   addInterview: (input: NewInterviewInput) => Promise<void>

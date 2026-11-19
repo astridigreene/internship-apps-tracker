@@ -10,9 +10,10 @@ import {
   type AssessmentEntry,
   type InterviewEntry,
   type LinkedActions,
+  type OfferDecision,
   type ScreeningEntry,
 } from '../types'
-import { StatusPill } from './StatusPill'
+import { OfferDecisionBadge, StatusPill } from './StatusPill'
 import { StatusSelect } from './StatusSelect'
 import { AssessmentPanel } from './AssessmentPanel'
 import { DateEntriesPanel } from './DateEntriesPanel'
@@ -142,6 +143,18 @@ export function ApplicationDetailModal({
       setEditingOfferDate(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save offer date')
+    }
+  }
+
+  async function saveOfferDecision(decision: OfferDecision) {
+    if (!linkedActions || saving || decision === current.offerDecision) {
+      return
+    }
+    setError(null)
+    try {
+      await linkedActions.updateOfferDecision(current, decision)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save offer decision')
     }
   }
 
@@ -340,6 +353,84 @@ export function ApplicationDetailModal({
                   ) : null}
                 </div>
               )}
+            </div>
+          ) : null}
+          {highest === 'Offer' ? (
+            <div>
+              <p className={fieldLabel}>Offer Decision</p>
+              <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                {current.offerDecision ? (
+                  <OfferDecisionBadge decision={current.offerDecision} />
+                ) : (
+                  <p className="text-[14px] font-semibold text-app-text-weak">Undecided</p>
+                )}
+                {linkedActions && current.offerDecision === '' ? (
+                  <>
+                    <button
+                      type="button"
+                      disabled={saving}
+                      title="I accepted this offer"
+                      onClick={() => void saveOfferDecision('Accepted')}
+                      className="h-8 rounded border px-2.5 text-[12px] font-bold disabled:cursor-not-allowed disabled:opacity-40 border-emerald-400 bg-emerald-500/10 text-emerald-800 hover:bg-emerald-500/20 dark:border-emerald-500/40 dark:text-emerald-200"
+                    >
+                      Accepted
+                    </button>
+                    <button
+                      type="button"
+                      disabled={saving}
+                      title="I turned this offer down"
+                      onClick={() => void saveOfferDecision('Declined')}
+                      className="h-8 rounded border px-2.5 text-[12px] font-bold disabled:cursor-not-allowed disabled:opacity-40 border-app-border text-app-text hover:bg-app-hover"
+                    >
+                      Declined
+                    </button>
+                  </>
+                ) : null}
+                {linkedActions && current.offerDecision === 'Accepted' ? (
+                  <>
+                    <button
+                      type="button"
+                      disabled={saving}
+                      title="I accepted, then backed out"
+                      onClick={() => void saveOfferDecision('Reneged')}
+                      className="h-8 rounded border px-2.5 text-[12px] font-bold disabled:cursor-not-allowed disabled:opacity-40 border-amber-400 bg-amber-500/10 text-amber-800 hover:bg-amber-500/20 dark:border-amber-500/40 dark:text-amber-200"
+                    >
+                      Reneged
+                    </button>
+                    <button
+                      type="button"
+                      disabled={saving}
+                      title="Back to undecided"
+                      onClick={() => void saveOfferDecision('')}
+                      className="h-8 rounded border px-2.5 text-[12px] font-bold disabled:cursor-not-allowed disabled:opacity-40 border-app-border text-app-text hover:bg-app-hover"
+                    >
+                      Undo
+                    </button>
+                  </>
+                ) : null}
+                {linkedActions && current.offerDecision === 'Declined' ? (
+                    <button
+                      type="button"
+                      disabled={saving}
+                      title="Back to undecided"
+                      onClick={() => void saveOfferDecision('')}
+                      className="h-8 rounded border px-2.5 text-[12px] font-bold disabled:cursor-not-allowed disabled:opacity-40 border-app-border text-app-text hover:bg-app-hover"
+                    >
+                      Undo
+                    </button>
+                ) : null}
+                {linkedActions && current.offerDecision === 'Reneged' ? (
+                    <button
+                      type="button"
+                      disabled={saving}
+                      title="Back to Accepted"
+                      onClick={() => void saveOfferDecision('Accepted')}
+                      className="h-8 rounded border px-2.5 text-[12px] font-bold disabled:cursor-not-allowed disabled:opacity-40 border-app-border text-app-text hover:bg-app-hover"
+                    >
+                      Undo
+                    </button>
+                ) : null}
+              </div>
             </div>
           ) : null}
           <div>

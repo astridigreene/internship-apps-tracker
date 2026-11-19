@@ -11,6 +11,7 @@ import {
   type NewAssessmentInput,
   type NewInterviewInput,
   type NewScreeningInput,
+  type OfferDecision,
   type ReturnOffer,
   type ScreeningEntry,
   SavedWithWarningError,
@@ -56,6 +57,7 @@ import {
   updateSheetOfferDate,
   updateSheetPay,
   updateSheetNotes,
+  updateSheetOfferDecision,
   updateSheetStatus,
 } from './lib/sheet'
 import { formatDisplayDateTime, hasMeetingEnded, parseSheetDate, statusUpdateStamp } from './lib/time'
@@ -680,6 +682,7 @@ export default function App() {
         pay: '',
         offerDate: shouldStampOfferDate(application.status, '') ? stamp : '',
         notes: '',
+        offerDecision: '',
         sheetRow,
       }
       const nextApps = [...data.applications, nextApp]
@@ -797,6 +800,42 @@ export default function App() {
       )
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Could not save pay'
+      setError(message)
+      throw err instanceof Error ? err : new Error(message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleUpdateOfferDecision(app: Application, decision: OfferDecision) {
+    if (!accessToken || !data || !sheetId) {
+      return
+    }
+    setError(null)
+    setSaving(true)
+    try {
+      const token = await ensureFreshToken()
+      const columns = await updateSheetOfferDecision({
+        spreadsheetId: sheetId,
+        accessToken: token,
+        sheetTitle: selectedYear,
+        sheetRow: app.sheetRow,
+        columns: data.columns,
+        decision,
+      })
+      setData((current) =>
+        current
+          ? {
+              ...current,
+              columns,
+              applications: current.applications.map((row) =>
+                row.sheetRow === app.sheetRow ? { ...row, offerDecision: decision } : row,
+              ),
+            }
+          : current,
+      )
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not save offer decision'
       setError(message)
       throw err instanceof Error ? err : new Error(message)
     } finally {
@@ -1439,6 +1478,7 @@ export default function App() {
     updatePay: handleUpdatePay,
     updateOfferDate: handleUpdateOfferDate,
     updateNotes: handleUpdateNotes,
+    updateOfferDecision: handleUpdateOfferDecision,
     addOa: (input) => handleAddAssessment('OA', input),
     addHireVue: (input) => handleAddAssessment('HireVue', input),
     addInterview: handleAddInterview,
