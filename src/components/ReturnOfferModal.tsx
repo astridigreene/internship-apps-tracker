@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
-import { formatPay, parsePay, type ReturnOffer } from '../types'
+import { formatPay, parsePay, type OfferDecision, type ReturnOffer } from '../types'
 import { parseSheetDate, toDateInputValue } from '../lib/time'
 
 interface ReturnOfferModalProps {
@@ -12,7 +12,7 @@ interface ReturnOfferModalProps {
   onSave?: (offer: ReturnOffer | null) => Promise<void>
 }
 
-const EMPTY: ReturnOffer = { company: '', location: '', role: '', pay: '', dateOffered: '' }
+const EMPTY: ReturnOffer = { company: '', location: '', role: '', pay: '', dateOffered: '', decision: '' }
 
 /** Add / edit / remove the year's single return offer. */
 export function ReturnOfferModal({ open, offer, saving, onClose, onSave }: ReturnOfferModalProps) {
@@ -165,6 +165,21 @@ export function ReturnOfferModal({ open, offer, saving, onClose, onSave }: Retur
               onChange={(e) => setForm((f) => ({ ...f, dateOffered: e.target.value }))}
               className={fieldClass}
             />
+          </label>
+          <label className={labelClass}>
+            Decision
+            <select
+              value={form.decision}
+              onChange={(e) => setForm((f) => ({ ...f, decision: e.target.value as OfferDecision }))}
+              className={fieldClass}
+            >
+              <option value="">Undecided</option>
+              <option value="Accepted">Accepted</option>
+              <option value="Declined">Declined</option>
+              {offer?.decision === 'Accepted' || offer?.decision === 'Reneged' ? (
+                <option value="Reneged">Reneged (accepted, then backed out)</option>
+              ) : null}
+            </select>
           </label>
 
           {error ? (

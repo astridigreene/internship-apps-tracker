@@ -14,7 +14,7 @@ import {
   type ScreeningEntry,
 } from '../types'
 import { StatusSelect } from '../components/StatusSelect'
-import { StatusPill } from '../components/StatusPill'
+import { OfferDecisionBadge, StatusPill } from '../components/StatusPill'
 import { NewApplicationModal } from '../components/NewApplicationModal'
 import { DeleteConfirmModal } from '../components/DeleteConfirmModal'
 import { ConfirmModal } from '../components/ConfirmModal'
@@ -547,7 +547,13 @@ export function ApplicationsView({
                 .map((part) => ` · ${part}`)
                 .join('')}
             </span>
-          ) : (
+          ) : null}
+          {returnOffer?.decision ? (
+            <span className="shrink-0">
+              <OfferDecisionBadge decision={returnOffer.decision} />
+            </span>
+          ) : null}
+          {returnOffer ? null : (
             <span className="min-w-0 flex-1 truncate text-[13px] font-semibold opacity-80">
               None logged — tap to add one
             </span>
@@ -598,7 +604,10 @@ export function ApplicationsView({
                             />
                           </div>
                         ) : (
-                          <StatusPill status={status} />
+                          <span className="flex items-center gap-1.5">
+                            <StatusPill status={status} />
+                            <OfferDecisionBadge decision={app.offerDecision} />
+                          </span>
                         )}
                       </div>
                       <p className="mt-1 text-[13px] font-semibold text-app-text">{app.role}</p>
@@ -712,6 +721,7 @@ export function ApplicationsView({
                       ) : (
                         <span className="flex min-w-0 items-center gap-1.5">
                           <StatusPill status={status} />
+                          <OfferDecisionBadge decision={app.offerDecision} />
                           {app.pay || app.offerDate ? (
                             <span className="truncate text-[12px] font-semibold text-app-text-weak tabular-nums">
                               {[formatPay(app.pay), formatDisplayDate(app.offerDate) || app.offerDate]
