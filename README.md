@@ -43,7 +43,7 @@ Your application rows stay in **your** Google Sheet. The site does not store you
 | Date Applied | Offer Date — stamped with today when an application is marked Offer (kept if already set); editable from the Offer's detail popup |
 | Status | |
 
-**Status values:** `Applied`, `Progressed`, `Interview`, `Offer`, `Rejected`
+**Status values:** `Applied`, `Progressed`, `Interview`, `Offer`, `Rejected`, `Withdrew`
 
 ### Sibling tabs per year (optional, auto-created)
 

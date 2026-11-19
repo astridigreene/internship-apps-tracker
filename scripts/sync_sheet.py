@@ -20,6 +20,7 @@ VALID_STATUSES = {
     "Interview",
     "Offer",
     "Rejected",
+    "Withdrew",
 }
 
 

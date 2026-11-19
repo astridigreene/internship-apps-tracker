@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
 import {
   formatPay,
+  isClosedStatus,
   isRejectedStatus,
+  isWithdrewStatus,
   type ReturnOffer,
   type Application,
   type ApplicationStatus,
@@ -31,6 +33,7 @@ type StatusFilter =
   | 'Interview'
   | 'Offer'
   | 'Rejected'
+  | 'Withdrew'
 
 export type ApplicationsStatusFilter = StatusFilter
 
@@ -42,6 +45,7 @@ const STATUS_OPTIONS: StatusFilter[] = [
   'Interview',
   'Offer',
   'Rejected',
+  'Withdrew',
 ]
 
 const COLUMNS: { key: SortKey; label: string; width: string }[] = [
@@ -113,10 +117,13 @@ function matchesStatus(
     return true
   }
   if (filter === 'Active') {
-    return !isRejectedStatus(status)
+    return !isClosedStatus(status)
   }
   if (filter === 'Rejected') {
     return isRejectedStatus(status)
+  }
+  if (filter === 'Withdrew') {
+    return isWithdrewStatus(status)
   }
   return status === filter
 }

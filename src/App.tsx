@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   deriveHighestStageOnStatusChange,
   isForwardProgress,
-  isRejectedStatus,
+  isClosedStatus,
   type Application,
   type AssessmentEntry,
   type InterviewEntry,
@@ -55,6 +55,7 @@ import {
   type LinkedKind,
   updateSheetOfferDate,
   updateSheetPay,
+  updateSheetNotes,
   updateSheetStatus,
 } from './lib/sheet'
 import { formatDisplayDateTime, hasMeetingEnded, parseSheetDate, statusUpdateStamp } from './lib/time'
@@ -678,6 +679,7 @@ export default function App() {
         oaComplete: null,
         pay: '',
         offerDate: shouldStampOfferDate(application.status, '') ? stamp : '',
+        notes: '',
         sheetRow,
       }
       const nextApps = [...data.applications, nextApp]
@@ -688,7 +690,7 @@ export default function App() {
         stats: computeStats(nextApps, data.returnOffer),
         lastSynced: new Date().toISOString(),
       })
-      if (!isRejectedStatus(application.status)) {
+      if (!isClosedStatus(application.status)) {
         celebrate()
       }
       // Empty GitHub commit only (no application fields). Optional; ignores failures.
@@ -795,6 +797,42 @@ export default function App() {
       )
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Could not save pay'
+      setError(message)
+      throw err instanceof Error ? err : new Error(message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleUpdateNotes(app: Application, notes: string) {
+    if (!accessToken || !data || !sheetId) {
+      return
+    }
+    setError(null)
+    setSaving(true)
+    try {
+      const token = await ensureFreshToken()
+      const columns = await updateSheetNotes({
+        spreadsheetId: sheetId,
+        accessToken: token,
+        sheetTitle: selectedYear,
+        sheetRow: app.sheetRow,
+        columns: data.columns,
+        notes,
+      })
+      setData((current) =>
+        current
+          ? {
+              ...current,
+              columns,
+              applications: current.applications.map((row) =>
+                row.sheetRow === app.sheetRow ? { ...row, notes: notes.trim() } : row,
+              ),
+            }
+          : current,
+      )
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not save notes'
       setError(message)
       throw err instanceof Error ? err : new Error(message)
     } finally {
@@ -1400,6 +1438,7 @@ export default function App() {
   const linkedActions: LinkedActions = {
     updatePay: handleUpdatePay,
     updateOfferDate: handleUpdateOfferDate,
+    updateNotes: handleUpdateNotes,
     addOa: (input) => handleAddAssessment('OA', input),
     addHireVue: (input) => handleAddAssessment('HireVue', input),
     addInterview: handleAddInterview,

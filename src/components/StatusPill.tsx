@@ -1,4 +1,4 @@
-import { isRejectedStatus } from '../types'
+import { isRejectedStatus, isWithdrewStatus } from '../types'
 
 const STATUS_STYLES: Record<string, string> = {
   Applied: 'bg-status-applied-bg text-status-applied-text',
@@ -6,6 +6,7 @@ const STATUS_STYLES: Record<string, string> = {
   Interview: 'bg-status-interview-bg text-status-interview-text',
   Offer: 'bg-status-offer-bg text-status-offer-text',
   Rejected: 'bg-status-rejected-bg text-status-rejected-text',
+  Withdrew: 'bg-status-withdrew-bg text-status-withdrew-text',
 }
 
 interface StatusPillProps {
@@ -15,7 +16,9 @@ interface StatusPillProps {
 export function StatusPill({ status }: StatusPillProps) {
   const styles = isRejectedStatus(status)
     ? STATUS_STYLES.Rejected
-    : (STATUS_STYLES[status] ?? 'bg-status-applied-bg text-status-applied-text')
+    : isWithdrewStatus(status)
+      ? STATUS_STYLES.Withdrew
+      : (STATUS_STYLES[status] ?? 'bg-status-applied-bg text-status-applied-text')
   return (
     <span
       className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[12px] leading-4 font-bold whitespace-nowrap ${styles}`}
